@@ -1,0 +1,2 @@
+pyzmq
+msgpack==0.5.6
