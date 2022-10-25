@@ -1,1 +1,1 @@
--e git+https://github.com/fabawi/wrapyfi.git#egg=wrapyfi
+.
