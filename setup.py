@@ -1,9 +1,5 @@
 import setuptools
 
-with open('requirements.txt') as f:
-    requirements = f.read().splitlines()
-
-
 setuptools.setup(
     name             = 'wrapyfi_interaces',
     version          = '0.1.0',
@@ -14,6 +10,6 @@ setuptools.setup(
     maintainer       = 'Fares Abawi',
     maintainer_email = 'fares.abawi@outlook.com',
     packages         = setuptools.find_packages(),
-    install_requires = requirements,
-    python_requires='>=3.6',
+    python_requires  = '>=3.6',
+    setup_requires   = ['wrapyfi>=0.4.5']
 )
