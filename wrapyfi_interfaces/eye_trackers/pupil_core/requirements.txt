@@ -1,2 +1,2 @@
 pyzmq
-msgpack==0.5.6
+msgpack>=0.5.6
