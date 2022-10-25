@@ -15,6 +15,9 @@ except ImportError:
     
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
 
+from wrapyfi_interfaces.utils import cartesian_to_spherical, exponential_smoothing_filter
+
+
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_COMMUNICATOR", "yarp")
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_MWARE", ICUB_DEFAULT_COMMUNICATOR)
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("ICUB_DEFAULT_COMMUNICATOR", ICUB_DEFAULT_COMMUNICATOR)
@@ -55,17 +58,6 @@ EMOTION_LOOKUP = {
     "Anger": "ang",
     "Contempt": "evi"
 }
-
-
-def cartesian_to_spherical(xyz):
-    import numpy as np
-    ptr = np.zeros((3,))
-    xy = xyz[0] ** 2 + xyz[1] ** 2
-    ptr[0] = np.arctan2(xyz[1], xyz[0])
-    ptr[1] = np.arctan2(xyz[2], np.sqrt(xy)) # for elevation angle defined from XY-plane up
-    # ptr[1] = np.arctan2(np.sqrt(xy), xyz[2])  # for elevation angle defined from Z-axis down
-    ptr[2] = np.sqrt(xy + xyz[2] ** 2)
-    return ptr
 
 
 class ICub(MiddlewareCommunicator, yarp.RFModule):
