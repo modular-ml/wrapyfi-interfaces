@@ -158,6 +158,8 @@ class Pupil(MiddlewareCommunicator):
         self.local_clock = None
         self.stable_offset_mean = None
 
+        self.prev_gaze = None
+
         # self.pub_socket = None
         # self.sub_socket_gaze = None
 
@@ -199,7 +201,7 @@ class Pupil(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "IMUPose", "/eye_tracker/IMUPose/head_pose_imu",
                                      carrier="mcast", should_wait=False)
-    def acquire_head_pose_imu(self):
+    def receive_head_pose_imu(self):
         return None,
 
     @MiddlewareCommunicator.register("NativeObject", "yarp", "Pupil", "/eye_tracker/Pupil/head_pose_imu",
@@ -217,7 +219,7 @@ class Pupil(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "FacePose", "/eye_tracker/FacePose/head_pose_face",
                                      carrier="mcast", should_wait=False)
-    def acquire_head_pose_face(self):
+    def receive_head_pose_face(self):
         return None,
 
     @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "Pupil", "/eye_tracker/Pupil/head_pose_face",
@@ -236,7 +238,7 @@ class Pupil(MiddlewareCommunicator):
     @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "GazeRecorder",
                                      "/eye_tracker/GazeRecorder/head_pose_fused",
                                      carrier="mcast", should_wait=False)
-    def acquire_head_pose_fused(self):
+    def receive_head_pose_fused(self):
         return None,
 
     @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "Pupil", "/eye_tracker/Pupil/head_pose_fused",
@@ -321,10 +323,42 @@ class Pupil(MiddlewareCommunicator):
     def acquire_recording_message(self):
         return None,
 
+    def getPeriod(self):
+        return 0.01
+
+    def updateModule(self):
+        if hasattr(self, "sub_socket_gaze"):
+            gaze, = self.read_gaze()
+            if gaze is not None:
+                self.prev_gaze = gaze
+                print(gaze)
+            else:
+                print(self.prev_gaze)
+        if hasattr(self, "pub_socket"):
+            session, = self.acquire_recording_message()
+            if session is not None:
+                if session.get("begin_calibration", False):
+                    self.start_calibration()
+                if session.get("end_calibration", False):
+                    self.end_calibration()
+                if session.get("start_recording", False):
+                    self.start_recording(session_name=session.get("recording_name", ""))
+                if session.get("end_recording", False):
+                    self.end_recording()
+                if session.get("play_info", False):
+                    self.write_recording_message(**session["play_info"])
+
+            for annotation in self.pose_annotation:
+                anno_return, = getattr(self, f"acquire_{annotation}")()
+                if anno_return is not None:
+                    head_pose, = getattr(self, f"write_{annotation}")(**anno_return)
+                    if head_pose is not None:
+                        print(head_pose)
+        return True
+
     def runModule(self):
         if self.pupil_remote is None:
             self.build()
-        prev_gaze = None
         while True:
             if hasattr(self, "pub_socket"):
                 session, = self.acquire_recording_message()
@@ -337,36 +371,10 @@ class Pupil(MiddlewareCommunicator):
                         break
             else:
                 break
-
         while True:
             try:
-                if hasattr(self, "sub_socket_gaze"):
-                    gaze, = self.read_gaze()
-                    if gaze is not None:
-                        prev_gaze = gaze
-                        print(gaze)
-                    else:
-                        print(prev_gaze)
-                if hasattr(self, "pub_socket"):
-                    session, = self.acquire_recording_message()
-                    if session is not None:
-                        if session.get("begin_calibration", False):
-                            self.start_calibration()
-                        if session.get("end_calibration", False):
-                            self.end_calibration()
-                        if session.get("start_recording", False):
-                            self.start_recording(session_name=session.get("recording_name", ""))
-                        if session.get("end_recording", False):
-                            self.end_recording()
-                        if session.get("play_info", False):
-                            self.write_recording_message(**session["play_info"])
-
-                    for annotation in self.pose_annotation:
-                        anno_return, = getattr(self, f"acquire_{annotation}")()
-                        if anno_return is not None:
-                            head_pose, = getattr(self, f"write_{annotation}")(**anno_return)
-                            if head_pose is not None:
-                                print(head_pose)
+                self.updateModule()
+                time.sleep(self.getPeriod())
             except Exception as e:
                 print(e)
                 break

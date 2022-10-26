@@ -12,7 +12,8 @@ WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_MWARE
 # TODO (fabawi): the ICM-20498 calibration script  https://github.com/WickedLukas/ICM20948/blob/master/ICM20948.cpp
 # TODO (fabawi): madgwick filter (post-proc)  https://github.com/WickedLukas/MadgwickAHRS/blob/master/MadgwickAHRS.cpp
 # TODO (fabawi): try out https://github.com/mad-lab-fau/imucal for gyroscope calibration
-# TODO (fabawi): otherwise, convert this (https://github.com/makerportal/mpu92-calibration) calibrator to work with ICM-20498 through serial instead of i2c since
+# TODO (fabawi): otherwise, convert this (https://github.com/makerportal/mpu92-calibration) calibrator to work with
+#  ICM-20498 through serial instead of i2c since
 #   1. we cannot run this code on our pico
 #   2. need to run this on a different imu than the one proposed in the tutorial
 
@@ -42,16 +43,24 @@ class IMUPose(MiddlewareCommunicator):
             imu_data = None
         return imu_data,
 
+    def getPeriod(self):
+        return 0.01
+
+    def updateModule(self):
+        imu_data, = self.read_pose()
+        if imu_data is not None and isinstance(imu_data, dict):
+            print(imu_data)
+        else:
+            print(imu_data)
+        return True
+
     def runModule(self):
         if self.pico is None:
             self.build()
         while True:
             try:
-                imu_data, = self.read_pose()
-                if imu_data is not None and isinstance(imu_data, dict):
-                    print(imu_data)
-                else:
-                    print(imu_data)
+                self.updateModule()
+                time.sleep(self.getPeriod())
             except:
                 break
 

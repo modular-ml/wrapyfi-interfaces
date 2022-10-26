@@ -102,9 +102,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self.client = pexpect.spawn(emotion_cmd)
             else:
                 logging.error("pexpect must be installed to control the emotion interface")
-                self.activate_communication(ICub.update_facial_expressions, "disable")
+                self.activate_communication(self.update_facial_expressions, "disable")
         else:
-            self.activate_communication(ICub.update_facial_expressions, "disable")
+            self.activate_communication(self.update_facial_expressions, "disable")
                 
         self._curr_eyes = [0, 0, 0]
         self._curr_head = [0, 0, 0]
@@ -158,21 +158,21 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             self.activate_communication(self.receive_images, "listen")
         if facial_expressions_port:
             if set_facial_expressions:
-                self.activate_communication(self.receive_facial_expressions, "publish")
+                self.activate_communication(self.acquire_facial_expressions, "publish")
             else:
-                self.activate_communication(self.receive_facial_expressions, "listen")
+                self.activate_communication(self.acquire_facial_expressions, "listen")
         if head_eye_coordinates_port:
             if set_head_eye_coordinates:
-                self.activate_communication(self.receive_head_eye_coordinates, "publish")
+                self.activate_communication(self.acquire_head_eye_coordinates, "publish")
             else:
-                self.activate_communication(self.receive_head_eye_coordinates, "listen")
+                self.activate_communication(self.acquire_head_eye_coordinates, "listen")
         if gaze_plane_coordinates_port:
             self.activate_communication(self.gaze_plane_coordinates_port, "listen")
 
     @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
                                      "ICub", "$head_eye_coordinates_port",
                                      should_wait=False)
-    def receive_head_eye_coordinates(self, head_eye_coordinates_port="/control_interface/head_eye_coordinates", cv2_key=None):
+    def acquire_head_eye_coordinates(self, head_eye_coordinates_port="/control_interface/head_eye_coordinates", cv2_key=None):
         if cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
             logging.error("controlling orientation in headless mode not yet supported")
@@ -373,7 +373,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
                                      "ICub", "$facial_expressions_port",
                                      should_wait=False)
-    def receive_facial_expressions(self, facial_expressions_port="/emotion_interface/facial_expressions", cv2_key=None):
+    def acquire_facial_expressions(self, facial_expressions_port="/emotion_interface/facial_expressions", cv2_key=None):
         emotion = None
         if cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
@@ -478,11 +478,11 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         else:
             k = None
 
-        switch_emotion, = self.receive_facial_expressions(facial_expressions_port=self.facial_expressions_port, cv2_key=k)
+        switch_emotion, = self.acquire_facial_expressions(facial_expressions_port=self.facial_expressions_port, cv2_key=k)
         if switch_emotion is not None and isinstance(switch_emotion, dict):
             self.update_facial_expressions(switch_emotion.get("emotion_category", None), part=switch_emotion.get("part", "LIGHTS"))
 
-        move_robot, = self.receive_head_eye_coordinates(head_eye_coordinates_port=self.head_eye_coordinates_port, cv2_key=k)
+        move_robot, = self.acquire_head_eye_coordinates(head_eye_coordinates_port=self.head_eye_coordinates_port, cv2_key=k)
         if move_robot is not None and isinstance(move_robot, dict):
             self.update_gaze_speed(head_vel=move_robot.get("head_vel", (10.0, 10.0, 20.0)),
                                 eyes_vel=move_robot.get("eyes_vel", (10.0, 10.0, 20.0)))
