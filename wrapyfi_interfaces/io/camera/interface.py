@@ -50,10 +50,11 @@ class MwareVideoCapture(MiddlewareCommunicator):
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
     """
-    ICub camera capturer. Image server on the real robot or ICub_SIM must be running. This can be used by other robots
+    Camera capturer with closer resemblance to cv2.VideoCapture rather than the naming conventions of Wrapyfi interfaces
     """
 
-    def __init__(self, camera="/icub/cam/left", fps=30, *args, **kwargs):
+    def __init__(self, camera="/camera_reader/camera_feed", fps=30,
+                 width=CAP_PROP_FRAME_WIDTH, height=CAP_PROP_FRAME_HEIGHT, *args, **kwargs):
         super(MiddlewareCommunicator, self).__init__()
 
         self.properties = {
@@ -64,8 +65,10 @@ class MwareVideoCapture(MiddlewareCommunicator):
             cv2.CAP_PROP_FRAME_WIDTH: "width",
             cv2.CAP_PROP_FRAME_HEIGHT: "height"
         }
+        MwareVideoCapture.CAP_PROP_FRAME_WIDTH = width
+        MwareVideoCapture.CAP_PROP_FRAME_HEIGHT = height
 
-        self.cam_props = {"port_cam": camera,
+        self.cam_props = {"camera_port": camera,
                           "fpos": 0,
                           "fps": fps,
                           "msec": 1 / fps,
@@ -75,22 +78,19 @@ class MwareVideoCapture(MiddlewareCommunicator):
                           "height": self.CAP_PROP_FRAME_HEIGHT}
 
         # control the listening properties from within the app
-        if os.environ.get("ESR_WEBCAM_MWARE", ""):
-            self.activate_communication("receive_image", "listen")
+        if camera:
+            self.activate_communication(self.receive_image, "listen")
 
         self.opened = True
 
     @MiddlewareCommunicator.register("Image", CAMERA_DEFAULT_COMMUNICATOR,
                                      "MwareVideoCapture", "$camera_port",
-                                     carrier="", width=CAP_PROP_FRAME_WIDTH, height=CAP_PROP_FRAME_HEIGHT, rgb=True)
-    def receive_image(self, camera_port):
+                                     carrier="", width="$width", height="$height", rgb=True)
+    def receive_image(self, camera_port, width=CAP_PROP_FRAME_WIDTH, height=CAP_PROP_FRAME_HEIGHT, **kwargs):
         return None,
 
     def retrieve(self):
         try:
-            # realtime capture with no fps interface, so we need to wait according to fps ignoring extra processing time
-            time.sleep(self.cam_props["msec"] - 0.033)  # Default iCub camera sampling is 30 FPS -> 1/30 = 0.033
-
             frame_index = self.cam_props["fpos"]
             im, = self.receive_image(**self.cam_props)
             self.opened = True
@@ -119,21 +119,28 @@ class MwareVideoCapture(MiddlewareCommunicator):
     def get(self, propId):
         return self.cam_props[self.properties[propId]]
 
+    def getPeriod(self):
+        return self.cam_props["msec"]
+
+    def runModule(self):
+
+    def updateModule(self):
+
 
 class Camera(MiddlewareCommunicator):
     def __init__(self, headless=False, get_cam_feed=True, cam_feed_port="/camera_reader/camera_feed",
-                 img_device=0, img_width=CAMERA_RESOLUTION[0], img_height=CAMERA_RESOLUTION[1], img_fps=30):
+                 cam_device=0, img_width=CAMERA_RESOLUTION[0], img_height=CAMERA_RESOLUTION[1], img_fps=30):
         super(MiddlewareCommunicator, self).__init__()
 
         self.headless = headless
         self.cam_feed_port = cam_feed_port
 
-        self.img_device = img_device
+        self.cam_device = cam_device
         self.img_width = img_width
         self.img_height = img_height
         self.img_fps = img_fps
 
-        self.vid_cap = cv2.VideoCapture(img_device)
+        self.vid_cap = cv2.VideoCapture(cam_device)
         if cam_feed_port:
             if get_cam_feed:
                 self.activate_communication(self.read_image, "listen")
@@ -144,7 +151,7 @@ class Camera(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("Image", "Camera", "$cam_feed_port",
                                      carrier="$cam_feed_carrier", rgb=True, should_wait=True)
-    def read_image(self, cam_feed_port="/cam_mic/cam_feed", cam_feed_carrier=""):
+    def write_image(self, cam_feed_port="/cam_mic/cam_feed", cam_feed_carrier=""):
         if self.vid_cap.isOpened():
             # capture the video stream from the camera
             grabbed, img = self.vid_cap.read()

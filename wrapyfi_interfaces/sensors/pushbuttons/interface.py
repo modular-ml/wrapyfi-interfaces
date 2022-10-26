@@ -18,14 +18,14 @@ class PushButton(MiddlewareCommunicator):
 
         self.arduino = serial.Serial(port=ser_device, baudrate=ser_rate, timeout=.1)
 
-        self.activate_communication("control_button", mode="publish")
-        self.activate_communication("triggered_button", mode="listen")
-        self.activate_communication("triggered_round", mode="listen")
+        self.activate_communication(self.update_button_light, mode="publish")
+        self.activate_communication(self.receive_button_command, mode="listen")
+        self.activate_communication(self.receive_message, mode="listen")
 
     @MiddlewareCommunicator.register("NativeObject", PUSHBUTTON_DEFAULT_COMMUNICATOR,
-                                     "PushButton", "/hri_sorter_game/buttonLightSwitch",
+                                     "PushButton", "/push_button/button_light",
                                      carrier="", should_wait=False)
-    def control_button(self, signal, interval=1):
+    def update_button_light(self, signal, interval=1):
         try:
             self.arduino.write(bytes(signal.get("signal", "0"), 'utf-8'))
             time.sleep(interval)
@@ -36,35 +36,44 @@ class PushButton(MiddlewareCommunicator):
         return buttons,
 
     @MiddlewareCommunicator.register("NativeObject", PUSHBUTTON_DEFAULT_COMMUNICATOR,
-                                     "PushButton", "/hri_sorter_game/buttonTrigger",
+                                     "PushButton", "/push_button/command",
                                      carrier="", should_wait=False)
-    def triggered_button(self):
-        return False,
+    def receive_button_command(self):
+        return None,
 
     @MiddlewareCommunicator.register("NativeObject", PUSHBUTTON_DEFAULT_COMMUNICATOR,
-                                     "PushButton", "/hri_sorter_game/roundTrigger",
+                                     "PushButton", "/push_button/message",
                                      carrier="mcast", should_wait=False)
-    def triggered_round(self):
-        return False,
+    def receive_message(self):
+        return None,
 
     @staticmethod
-    def update_round(switch_round):
-        if switch_round.get("signal", "none") == "exit":
+    def check_exit(message):
+        if message.get("signal", "none") == "exit":
             exit(0)
+
+    def getPeriod(self):
+        return 1
+
+    def updateModule(self):
+        button_msg, = self.receive_message()
+        if button_msg is not None and isinstance(button_msg, dict):
+            self.check_exit(button_msg)
+        self.update_button_light({"signal": "0"})
+        button_cmd, = self.receive_button_command()
+        if button_cmd is not None and isinstance(button_cmd, dict):
+            self.update_button_light(button_cmd)
+        return True
 
     def runModule(self):
         while True:
             try:
-                switch_round, = self.triggered_round()
-                if switch_round and isinstance(switch_round, dict):
-                    self.update_round(switch_round)
-                self.control_button({"signal": "0"})
-                button_cmd, = self.triggered_button()
-                if button_cmd and isinstance(button_cmd, dict):
-                    self.control_button(button_cmd)
+                self.updateModule()
+                time.sleep(self.getPeriod())
             except:
                 break
 
     def __del__(self):
         self.arduino.close()
 
+# TODO (fabawi): main
