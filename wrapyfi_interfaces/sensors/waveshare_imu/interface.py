@@ -18,7 +18,7 @@ WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_MWARE
 #   2. need to run this on a different imu than the one proposed in the tutorial
 
 
-class IMUPose(MiddlewareCommunicator):
+class WaveshareIMU(MiddlewareCommunicator):
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200):
         super(MiddlewareCommunicator, self).__init__()
         self.ser_device = ser_device
@@ -29,15 +29,18 @@ class IMUPose(MiddlewareCommunicator):
     def build(self):
         self.pico = serial.Serial(port=self.ser_device, baudrate=self.ser_rate, timeout=.1)
 
-        self.activate_communication(getattr(self, "read_pose"), "publish")
+        self.activate_communication(self.read_orientation, "publish")
 
-    @MiddlewareCommunicator.register("NativeObject", WAVESHARE_IMU_DEFAULT_COMMUNICATOR, "IMUPose", "/eye_tracker/IMUPose/head_pose_imu",
+    @MiddlewareCommunicator.register("NativeObject", WAVESHARE_IMU_DEFAULT_COMMUNICATOR, "WaveshareIMU",
+                                     "/waveshare_imu_reader/orientation",
                                      carrier="mcast", should_wait=False)
-    def read_pose(self):
+    def read_orientation(self):
         try:
             sensor_data = self.pico.readline().decode("utf-8")
             imu_data = json.loads(sensor_data)
-            imu_data.update(topic="imu_orientation", world_index=self.counter, imu_timestamp=time.time())
+            imu_data.update(topic="imu_orientation",
+                            world_index=self.counter,
+                            timestamp=time.time())
             self.counter += 1
         except:
             imu_data = None
@@ -47,7 +50,7 @@ class IMUPose(MiddlewareCommunicator):
         return 0.01
 
     def updateModule(self):
-        imu_data, = self.read_pose()
+        imu_data, = self.read_orientation()
         if imu_data is not None and isinstance(imu_data, dict):
             print(imu_data)
         else:
@@ -70,5 +73,5 @@ class IMUPose(MiddlewareCommunicator):
 
 
 if __name__ == "__main__":
-    imu = IMUPose(ser_device="/dev/ttyACM0")
+    imu = WaveshareIMU(ser_device="/dev/ttyACM0")
     imu.runModule()
