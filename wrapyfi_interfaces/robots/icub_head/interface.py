@@ -124,8 +124,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self._igaze.setStabilizationMode(True)
 
                 # set movement speed
-                # self._igaze.setNeckTrajTime(0.8)
-                # self._igaze.setEyesTrajTime(0.5)
+                # self.update_speed_gaze(head_vel=0.8, eyes_vel=0.5)
+                
             else:
                 # create remote driver
                 self._head_driver = yarp.PolyDriver(props)
@@ -144,12 +144,11 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self._ienc.getEncoders(self._encs.data())
 
                 # set movement speed
-                # self.set_speed_gaze(head_vel=move_robot.get("head_vel", (10.0, 10.0, 20.0)),
-                #                        eyes_vel=move_robot.get("eyes_vel", (10.0, 10.0, 20.0)))
+                # self.update_speed_gaze(head_vel=(10.0, 10.0, 20.0), eyes_vel=(10.0, 10.0, 20.0))
 
         else:
             self.activate_communication(self.reset_gaze, "disable")
-            self.activate_communication(self.set_speed_gaze, "disable")
+            self.activate_communication(self.update_gaze_speed, "disable")
             self.activate_communication(self.control_gaze, "disable")
             self.activate_communication(self.wait_for_gaze, "disable")
             self.activate_communication(self.control_gaze_at_plane, "disable")
@@ -270,7 +269,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
                                      "ICub", "/icub_controller/logs/update_head_eye_velocity",
                                      should_wait=False)
-    def set_speed_gaze(self, head_vel=(10.0, 10.0, 20.0), eyes_vel=(20.0, 20.0, 20.0)):
+    def update_gaze_speed(self, head_vel=(10.0, 10.0, 20.0), eyes_vel=(20.0, 20.0, 20.0)):
         """
         Control the iCub head and eye speeds
         :param head_vel: Head speed (tilt, swing, pan) in deg/sec or int for neck speed (norm) when using iKinGaze
@@ -485,7 +484,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         move_robot, = self.receive_head_eye_coordinates(head_eye_coordinates_port=self.head_eye_coordinates_port, cv2_key=k)
         if move_robot is not None and isinstance(move_robot, dict):
-            self.set_speed_gaze(head_vel=move_robot.get("head_vel", (10.0, 10.0, 20.0)),
+            self.update_gaze_speed(head_vel=move_robot.get("head_vel", (10.0, 10.0, 20.0)),
                                 eyes_vel=move_robot.get("eyes_vel", (10.0, 10.0, 20.0)))
             if move_robot.get("reset_gaze", False):
                 self.reset_gaze()
@@ -493,7 +492,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         move_robot, = self.receive_gaze_plane_coordinates(gaze_plane_coordinates_port=self.gaze_plane_coordinates_port)
         if move_robot is not None and isinstance(move_robot, dict):
-            self.set_speed_gaze(head_vel=move_robot.get("head_vel", (10.0, 10.0, 20.0) if not self.ikingaze else 0.8),
+            self.update_gaze_speed(head_vel=move_robot.get("head_vel", (10.0, 10.0, 20.0) if not self.ikingaze else 0.8),
                                 eyes_vel=move_robot.get("eyes_vel", (10.0, 10.0, 20.0) if not self.ikingaze else 0.5))
             if move_robot.get("reset_gaze", False):
                 self.reset_gaze()
