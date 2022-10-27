@@ -23,7 +23,6 @@ ICUB_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_MWARE", ICUB_DEFAULT
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("ICUB_DEFAULT_COMMUNICATOR", ICUB_DEFAULT_COMMUNICATOR)
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("ICUB_DEFAULT_MWARE", ICUB_DEFAULT_COMMUNICATOR)
 
-CAMERA_RESOLUTION = (320, 240)  # width, height
 
 """
 ICub head controller and camera viewer
@@ -61,7 +60,10 @@ EMOTION_LOOKUP = {
 
 
 class ICub(MiddlewareCommunicator, yarp.RFModule):
+    CAP_PROP_FRAME_WIDTH = 320
+    CAP_PROP_FRAME_HEIGHT = 240
     def __init__(self, simulation=False, headless=False, get_cam_feed=True,
+                 img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
                  control_head=True,
                  set_head_eye_coordinates=True, head_eye_coordinates_port="/control_interface/head_eye_coordinates",
                  ikingaze=False,
@@ -85,16 +87,26 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         if simulation:
             props.put("remote", "/icubSim/head")
-            self.cam_props = {"port_cam": "/icubSim/cam",
-                              "port_cam_left": "/icubSim/cam/left",
-                              "port_cam_right": "/icubSim/cam/right"}
+            self.cam_props = {"cam_world_port": "/icubSim/cam",
+                              "cam_left_port": "/icubSim/cam/left",
+                              "cam_right_port": "/icubSim/cam/right"}
             emotion_cmd = f"yarp rpc /icubSim/face/emotions/in"
         else:
             props.put("remote", "/icub/head")
-            self.cam_props = {"port_cam": "/icub/cam/left",
-                              "port_cam_left": "/icub/cam/left",
-                              "port_cam_right": "/icub/cam/right"}
+            self.cam_props = {"cam_world_port": "/icub/cam/left",
+                              "cam_left_port": "/icub/cam/left",
+                              "cam_right_port": "/icub/cam/right"}
             emotion_cmd = f"yarp rpc /icub/face/emotions/in"
+
+        if img_width is not None:
+            self.img_width = img_width
+            ICub.CAP_PROP_FRAME_WIDTH = img_width
+            self.cam_props["img_width"] = img_width
+
+        if img_height is not None:
+            self.img_height = img_height
+            ICub.CAP_PROP_FRAME_HEIGHT = img_height
+            self.cam_props["img_height"] = img_height
 
         if control_expressions:
             if HAVE_PEXPECT:
@@ -449,14 +461,14 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 "timestamp": time.time(), 
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},
 
-    @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$port_cam",
-                                     width="$width", height="$height", rgb="$rgb")
-    @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$port_cam_left",
-                                     width="$width", height="$height", rgb="$rgb")
-    @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$port_cam_right",
-                                     width="$width", height="$height", rgb="$rgb")
-    def receive_images(self, port_cam, port_cam_left, port_cam_right,
-                       width=CAMERA_RESOLUTION[0], height=CAMERA_RESOLUTION[1], rgb=True):
+    @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$cam_world_port",
+                                     width="$img_width", height="$img_height", rgb="$rgb")
+    @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$cam_left_port",
+                                     width="$img_width", height="$img_height", rgb="$rgb")
+    @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$cam_right_port",
+                                     width="$img_width", height="$img_height", rgb="$rgb")
+    def receive_images(self, cam_world_port, cam_left_port, cam_right_port,
+                       img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, rgb=True):
         external_cam, left_cam, right_cam = None, None, None
         return external_cam, left_cam, right_cam
 
@@ -467,9 +479,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         # print(self.getPeriod())
         external_cam, left_cam, right_cam = self.receive_images(**self.cam_props)
         if external_cam is None:
-            external_cam = np.zeros((CAMERA_RESOLUTION[1], CAMERA_RESOLUTION[0], 1), dtype="uint8")
-            left_cam = np.zeros((CAMERA_RESOLUTION[1], CAMERA_RESOLUTION[0], 1), dtype="uint8")
-            right_cam = np.zeros((CAMERA_RESOLUTION[1], CAMERA_RESOLUTION[0], 1), dtype="uint8")
+            external_cam = np.zeros((self.img_height, self.img_width, 1), dtype="uint8")
+            left_cam = np.zeros((self.img_height, self.img_width, 1), dtype="uint8")
+            right_cam = np.zeros((self.img_height, self.img_width, 1), dtype="uint8")
         else:
             external_cam = cv2.cvtColor(external_cam, cv2.COLOR_BGR2RGB)
             left_cam = cv2.cvtColor(left_cam, cv2.COLOR_BGR2RGB)
