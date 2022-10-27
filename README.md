@@ -25,7 +25,7 @@ which automatically installs the available interfaces assuming Wrapyfi is alread
 The interface can be imported directly e.g.:
 
 ```
-from wrapyfi_interfaces.robots.icub_head.interface import ICub
+import wrapyfi_interfaces.robots.icub_head.interface as icub_head_interface
 ```
 
 Or as a broker e.g.:
