@@ -1,6 +1,7 @@
 import os
 import time
 
+import threading
 import json
 import serial
 
@@ -11,8 +12,11 @@ PUSHBUTTON_DEFAULT_COMMUNICATOR = os.environ.get("PUSHBUTTON_DEFAULT_MWARE", PUS
 
 
 class PushButton(MiddlewareCommunicator):
-    def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200):
+    def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200, btn_source=0):
         super(MiddlewareCommunicator, self).__init__()
+        
+        self.lock = threading.Lock()
+        
         self.ser_device = ser_device
         self.ser_rate = ser_rate
 
@@ -21,6 +25,20 @@ class PushButton(MiddlewareCommunicator):
         self.activate_communication(self.update_button_light, mode="publish")
         self.activate_communication(self.receive_button_command, mode="listen")
         self.activate_communication(self.receive_message, mode="listen")
+        
+        self.button_mappings = {
+            "led_smart": "LED1" if btn_source == 0 else "LED2",
+            "on_smart": 49 if btn_source == 0 else 51,
+            "off_smart": 48 if btn_source == 0 else 50,
+            "led_random": "LED1" if btn_source == 1 else "LED2",
+            "on_random": 49 if btn_source == 1 else 51,
+            "off_random": 48 if btn_source == 1 else 50,
+            0: "off",
+            1: "on"
+        }
+        
+        self.last_button = {"signal": None,
+                            "time": time.time()}
 
     @MiddlewareCommunicator.register("NativeObject", PUSHBUTTON_DEFAULT_COMMUNICATOR,
                                      "PushButton", "/push_button/button_light",
@@ -31,6 +49,7 @@ class PushButton(MiddlewareCommunicator):
             time.sleep(interval)
             sensor = self.arduino.readline().decode("utf-8")
             buttons = json.loads(sensor)
+            buttons.update(**{"timestamp": time.time())
         except:
             buttons = False
         return buttons,
@@ -38,8 +57,31 @@ class PushButton(MiddlewareCommunicator):
     @MiddlewareCommunicator.register("NativeObject", PUSHBUTTON_DEFAULT_COMMUNICATOR,
                                      "PushButton", "/push_button/command",
                                      carrier="", should_wait=False)
-    def receive_button_command(self):
-        return None,
+    def acquire_button_press(self, signal):
+        signal = self.button_mappings.get(signal, 0)  # random number indicating a return request from button
+        with self.lock:
+            self.last_button.update(**{"signal": str(signal),
+                                       "timestamp": time.time()})
+        return self.last_button,
+    
+    def wait_for_button(self):
+        while True:
+            time.sleep(3)
+            btn_resp, = self.update_button_light(self.last_button)
+            if btn_resp and isinstance(btn_resp, dict):
+                if btn_resp.get(self.button_mappings["led_smart"], 1000) == 0:
+                    with self.lock:
+                        self.last_button.update(**{"trigger": "smart",
+                                                   "signal": str(self.button_mappings["led_smart"]),
+                                                   "time": time.time()})
+                    break
+                if btn_resp.get(self.button_mappings["led_random"], 1000) == 0:
+                    with self.lock:
+                        self.last_button.update(**{"trigger": "random",
+                                                   "signal": str(self.button_mappings["led_random"]),
+                                                   "time": time.time()})
+                    break
+    
 
     @MiddlewareCommunicator.register("NativeObject", PUSHBUTTON_DEFAULT_COMMUNICATOR,
                                      "PushButton", "/push_button/message",
@@ -60,7 +102,7 @@ class PushButton(MiddlewareCommunicator):
         if button_msg is not None and isinstance(button_msg, dict):
             self.check_exit(button_msg)
         self.update_button_light({"signal": "0"})
-        button_cmd, = self.receive_button_command()
+        button_cmd, = self.read_button_press()
         if button_cmd is not None and isinstance(button_cmd, dict):
             self.update_button_light(button_cmd)
         return True
