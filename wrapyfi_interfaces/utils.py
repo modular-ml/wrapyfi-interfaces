@@ -1,3 +1,12 @@
+
+
+def str_or_int(arg):
+  try:
+    return int(arg)  # try convert to int
+  except ValueError:
+    return arg
+
+
 def cartesian_to_spherical(xyz):
   import numpy as np
   ptr = np.zeros((3,))
