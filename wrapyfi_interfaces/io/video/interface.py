@@ -182,7 +182,7 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
         if not self.headless:
             if img is not None:
                 cv2.imshow("VideoCapture", img)
-                k = cv2.waitKey(33)
+                k = cv2.waitKey(int(self.getPeriod()*1000))
                 if k == 27:  # Esc key to exit
                     exit(0)
                 elif k == -1:  # normally -1 returned,so don"t print it
@@ -224,7 +224,8 @@ class VideoCaptureReceiver(VideoCapture):
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
 
-    def __init__(self, cap_feed_port="/video_reader/video_feed", cap_feed_carrier="", headless=False, should_wait=False,
+    def __init__(self, cap_feed_port="/video_reader/video_feed", cap_feed_carrier="",
+                 headless=False, should_wait=False, multithreading=False,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, **kwargs):
         VideoCapture.__init__(self, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
                               headless=headless, should_wait=should_wait, img_width=False, img_height=False,
