@@ -2,6 +2,8 @@
 import logging
 import argparse
 import time
+from queue import Queue
+from threading import Thread
 
 import os
 import cv2
@@ -47,11 +49,12 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
     SHOULD_WAIT = False
 
     def __init__(self, cap_source, cap_feed_port="/video_reader/video_feed", cap_feed_carrier="",
-                 headless=False, should_wait=False, force_resize=False,
+                 headless=False, should_wait=False, multithreading=True, queue_size=10, force_resize=False,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, **kwargs):
         MiddlewareCommunicator.__init__(self)
 
         VideoCapture.SHOULD_WAIT = should_wait
+        self.multithreading = multithreading
         self.force_resize = force_resize
 
         if cap_source:
@@ -89,6 +92,29 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
 
         self.last_img = None
 
+        if multithreading:
+            self.queue = Queue(maxsize=queue_size)
+            self.thread = Thread(target=self.update, args=())
+            self.thread.daemon = True
+            self.thread.start()
+
+    def update(self, **kwargs):
+        while True:
+            if not self.isOpened():
+                break
+
+            if not self.queue.full():
+                grabbed, img = super().read(**kwargs)
+
+                if not grabbed:
+                    self.release(force=False)
+
+                self.queue.put(img)
+            else:
+                time.sleep(0.1)
+
+        self.release(force=False)
+
     @MiddlewareCommunicator.register("Image", CAMERA_DEFAULT_COMMUNICATOR, "VideoCapture", "$cap_feed_port",
                                      carrier="$cap_feed_carrier", width="$img_width", height="$img_height",rgb=True,
                                      should_wait="$should_wait")
@@ -104,24 +130,33 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
 
             if not grabbed:
                 logging.warning("video not grabbed")
-                img = np.random.random((self.img_width, self.img_height, 3)) * 255 if self.last_img is None \
+                img = np.zeros((img_height, img_width, 3)) * 255 if self.last_img is None \
                     else self.last_img
             else:
-                if self.force_resize:
-                    img = cv2.resize(img, (img_width, img_height), interpolation=cv2.INTER_AREA)
-                self.last_img = img
+                if img is not None:
+                    if self.force_resize:
+                        img = cv2.resize(img, (img_width, img_height), interpolation=cv2.INTER_AREA)
+                    self.last_img = img
+                else:
+                    img = np.zeros((img_height, img_width, 3)) * 255
         else:
             logging.error("video capturer not opened")
-            img = np.random.random((self.img_width, self.img_height, 3)) * 255
+            img = np.zeros((img_width, img_height, 3)) * 255
         return img,
 
     def read(self, **kwargs):
         if kwargs.get("_internal_call", False):
             del kwargs["_internal_call"]
-            grabbed, img = super().read(**kwargs)
+            if self.multithreading:
+                grabbed, img = True, self.queue.get()
+            else:
+                grabbed, img = super().read(**kwargs)
             return grabbed, img
         else:
-            grabbed, img = super().read(**kwargs)
+            if self.multithreading:
+                grabbed, img = True, self.queue.get()
+            else:
+                grabbed, img = super().read(**kwargs)
             if grabbed:
                 img, = self.acquire_image(cap_feed_port=self.cap_feed_port, cap_feed_carrier=self.cap_feed_carrier,
                                    img_width=self.img_width, img_height=self.img_height,
@@ -160,8 +195,29 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             self.updateModule()
             # time.sleep(self.getPeriod())
 
+    def has_next(self, max_tries=10):
+        tries = 0
+        while self.queue.qsize() == 0 and tries < max_tries and self.isOpened():
+            time.sleep(0.05)
+            tries += 1
+        return self.queue.qsize() > 0
+
     def __del__(self):
         self.release()
+
+    def release(self, force=True):
+        if self.multithreading:
+            if force:
+                self.thread.join()
+                super().release()
+            else:
+                if self.has_next():
+                    return False
+                else:
+                    super().release()
+                    self.thread.join()
+        else:
+            super().release()
 
 
 class VideoCaptureReceiver(VideoCapture):
@@ -172,7 +228,7 @@ class VideoCaptureReceiver(VideoCapture):
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, **kwargs):
         VideoCapture.__init__(self, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
                               headless=headless, should_wait=should_wait, img_width=False, img_height=False,
-                              fps=False, **kwargs)
+                              fps=False, multithreading=False, **kwargs)
 
         self.cap_feed_port = cap_feed_port
 
@@ -245,6 +301,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--headless", action="store_true", help="Disable CV2 GUI")
     parser.add_argument("--should_wait", action="store_true", help="Wait for at least one listener before publishing")
+    parser.add_argument("--multithreading", action="store_true", help="Enable multithreading for publishing capturer")
+    parser.add_argument("--queue_size", type=int, default=10, help="Queue size for multithreading")
     parser.add_argument("--force_resize", action="store_true", help="Force resizing video width and height on publishing")
     parser.add_argument("--cap_feed_port", type=str, default="/video_reader/video_feed",
                         help="The middleware port for publishing/receiving the image")
@@ -253,9 +311,9 @@ def parse_args():
                              "yarp - udp, tcp, mcast; ros - udp, tcp; zeromq - tcp")
     parser.add_argument("--cap_source", type=str, default="",
                         help="The video capture source id (int camera id | str video path | str image path)")
-    parser.add_argument("--img_width", type=int, default=320, help="The image width")
-    parser.add_argument("--img_height", type=int, default=240, help="The image height")
-    parser.add_argument("--fps", type=int, default=60, help="The video frames per second")
+    parser.add_argument("--img_width", type=int, default=1280, help="The image width")
+    parser.add_argument("--img_height", type=int, default=720, help="The image height")
+    parser.add_argument("--fps", type=int, default=30, help="The video frames per second")
 
     return parser.parse_args()
 
