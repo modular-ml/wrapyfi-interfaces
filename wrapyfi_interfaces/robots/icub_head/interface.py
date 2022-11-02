@@ -15,7 +15,7 @@ except ImportError:
     
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
 
-from wrapyfi_interfaces.utils import cartesian_to_spherical, exponential_smoothing_filter
+from wrapyfi_interfaces.utils import cartesian_to_spherical, mode_smoothing_filter
 
 
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_COMMUNICATOR", "yarp")
