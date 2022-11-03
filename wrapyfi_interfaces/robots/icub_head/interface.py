@@ -2,6 +2,7 @@ import os
 import time
 import argparse
 import logging
+import functools
 
 import cv2
 import numpy as np
@@ -14,7 +15,6 @@ except ImportError:
     HAVE_PEXPECT = False
     
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
-
 from wrapyfi_interfaces.utils import cartesian_to_spherical, mode_smoothing_filter
 
 
@@ -60,25 +60,33 @@ EMOTION_LOOKUP = {
 
 
 class ICub(MiddlewareCommunicator, yarp.RFModule):
+    MWARE = ICUB_DEFAULT_COMMUNICATOR
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
+    HEAD_EYE_COORDINATES_PORT = "/control_interface/head_eye_coordinates"
+    GAZE_PLANE_COORDINATES_PORT = "/control_interface/gaze_plane_coordinates"
+    FACIAL_EXPRESSIONS_PORT = "/control_interface/facial_expressions"
+
     def __init__(self, simulation=False, headless=False, get_cam_feed=True,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
                  control_head=True,
-                 set_head_eye_coordinates=True, head_eye_coordinates_port="/control_interface/head_eye_coordinates",
+                 set_head_eye_coordinates=True, head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT,
                  ikingaze=False,
-                 gaze_plane_coordinates_port="/control_interface/gaze_plane_coordinates",
+                 gaze_plane_coordinates_port=GAZE_PLANE_COORDINATES_PORT,
                  control_expressions=False,
-                 set_facial_expressions=True, facial_expressions_port="/emotion_interace/facial_expressions",):
+                 set_facial_expressions=True, facial_expressions_port=FACIAL_EXPRESSIONS_PORT,
+                 mware=MWARE):
         self.__name__ = "iCubController"
         MiddlewareCommunicator.__init__(self)
         yarp.RFModule.__init__(self)
 
+        self.MWARE = mware
+        self.FACIAL_EXPRESSIONS_PORT = facial_expressions_port
+        self.GAZE_PLANE_COORDINATES_PORT = gaze_plane_coordinates_port
+        self.HEAD_EYE_COORDINATES_PORT = head_eye_coordinates_port
+
         self.headless = headless
         self.ikingaze = ikingaze
-        self.facial_expressions_port = facial_expressions_port
-        self.gaze_plane_coordinates_port = gaze_plane_coordinates_port
-        self.head_eye_coordinates_port = head_eye_coordinates_port
 
         # prepare a property object   
         props = yarp.Property()
@@ -100,12 +108,12 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         if img_width is not None:
             self.img_width = img_width
-            ICub.CAP_PROP_FRAME_WIDTH = img_width
+            self.CAP_PROP_FRAME_WIDTH = img_width
             self.cam_props["img_width"] = img_width
 
         if img_height is not None:
             self.img_height = img_height
-            ICub.CAP_PROP_FRAME_HEIGHT = img_height
+            self.CAP_PROP_FRAME_HEIGHT = img_height
             self.cam_props["img_height"] = img_height
 
         if control_expressions:
@@ -181,11 +189,33 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         if gaze_plane_coordinates_port:
             self.activate_communication(self.gaze_plane_coordinates_port, "listen")
 
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+        self.build()
+
+    def build(self):
+        self.acquire_head_eye_coordinates = functools.partial(self.acquire_head_eye_coordinates,
+                                                              head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
+                                                              _mware=self.MWARE)
+        self.acquire_facial_expressions = functools.partial(self.acquire_facial_expressions,
+                                                           facial_expressions_port=self.FACIAL_EXPRESSIONS_PORT,
+                                                           _mware=self.MWARE)
+        self.receive_gaze_plane_coordinates = functools.partial(self.receive_gaze_plane_coordinates,
+                                                                gaze_plane_coordinates_port=self.GAZE_PLANE_COORDINATES_PORT,
+                                                                _mware=self.MWARE)
+        self.receive_images = functools.partial(self.receive_images,
+                                                img_width=self.CAP_PROP_FRAME_WIDTH,
+                                                img_height=self.CAP_PROP_FRAME_HEIGHT)
+        self.reset_gaze = functools.partial(self.reset_gaze, _mware=self.MWARE)
+        self.update_gaze_speed = functools.partial(self.update_gaze_speed, _mware=self.MWARE)
+        self.control_gaze = functools.partial(self.control_gaze, _mware=self.MWARE)
+        self.wait_for_gaze = functools.partial(self.wait_for_gaze, _mware=self.MWARE)
+        self.control_gaze_at_plane = functools.partial(self.control_gaze_at_plane, _mware=self.MWARE)
+        self.update_facial_expressions = functools.partial(self.update_facial_expressions, _mware=self.MWARE)
+
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$head_eye_coordinates_port",
                                      should_wait=False)
-    def acquire_head_eye_coordinates(self, 
-                                     head_eye_coordinates_port="/control_interface/head_eye_coordinates", cv2_key=None):
+    def acquire_head_eye_coordinates(self, head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT, cv2_key=None,
+                                     _mware=MWARE):
         if cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
             logging.error("controlling orientation in headless mode not yet supported")
@@ -239,17 +269,16 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                     "head": self._curr_head,
                     "eyes": self._curr_eyes},
 
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$gaze_plane_coordinates_port",
                                      should_wait=False)
-    def receive_gaze_plane_coordinates(self, 
-                                       gaze_plane_coordinates_port="/control_interface/gaze_plane_coordinates"):
+    def receive_gaze_plane_coordinates(self, gaze_plane_coordinates_port=GAZE_PLANE_COORDINATES_PORT, _mware=MWARE):
         return None,
 
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/wait_for_gaze",
                                      should_wait=False)
-    def wait_for_gaze(self, reset=True):
+    def wait_for_gaze(self, reset=True, _mware=MWARE):
         if self.ikingaze:
             # self._igaze.clearNeckPitch()
             # self._igaze.clearNeckRoll()
@@ -267,10 +296,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 "timestamp": time.time(),
                 "command": f"waiting for gaze completed with reset={reset}"},
 
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/reset_gaze",
                                      should_wait=False)
-    def reset_gaze(self):
+    def reset_gaze(self, _mware=MWARE):
         """
         Reset the eyes to their original position
         :return: None
@@ -280,10 +309,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             "timestamp": time.time(),
             "command": f"reset gaze"},
         
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$mware",
                                      "ICub", "/icub_controller/logs/head_eye_speed",
                                      should_wait=False)
-    def update_gaze_speed(self, head_speed=(10.0, 10.0, 20.0), eyes_speed=(20.0, 20.0, 20.0)):
+    def update_gaze_speed(self, head_speed=(10.0, 10.0, 20.0), eyes_speed=(20.0, 20.0, 20.0), _mware=MWARE):
         """
         Control the iCub head and eye speeds
         :param head_speed: Head speed (tilt, swing, pan) in deg/sec or int for neck speed (norm) when using iKinGaze
@@ -311,10 +340,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 "timestamp": time.time(), 
                 "command": f"head set to {head_speed} and eyes set to {eyes_speed}"},
     
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/head_eye_coordinates",
                                      should_wait=False)
-    def control_gaze(self, head=(0, 0, 0), eyes=(0, 0, 0)):
+    def control_gaze(self, head=(0, 0, 0), eyes=(0, 0, 0), _mware=MWARE):
         """
         Control the iCub head or eyes
         :param head: Head coordinates (tilt, swing, pan) in degrees
@@ -344,10 +373,11 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 "timestamp": time.time(), 
                 "command": f"head set to {head} and eyes set to {eyes}"},
 
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/gaze_plane_coordinates",
                                      should_wait=False)
-    def control_gaze_at_plane(self, xy=(0, 0,), limiting_consts_xy=(0.3, 0.3), control_eyes=True, control_head=True):
+    def control_gaze_at_plane(self, xy=(0, 0,), limiting_consts_xy=(0.3, 0.3), control_eyes=True, control_head=True,
+                              _mware=MWARE):
         """
         Gaze at specific point in a normalized plane in front of the robot
 
@@ -384,10 +414,11 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 "timestamp": time.time(),
                 "command": f"moving gaze toward {ptr_degrees} with head={control_head} and eyes={control_eyes}"},
 
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$facial_expressions_port",
                                      should_wait=False)
-    def acquire_facial_expressions(self, facial_expressions_port="/emotion_interface/facial_expressions", cv2_key=None):
+    def acquire_facial_expressions(self, facial_expressions_port=FACIAL_EXPRESSIONS_PORT, cv2_key=None,
+                                   _mware=MWARE):
         emotion = None
         if cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
@@ -429,10 +460,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                     "timestamp": time.time(),
                     "emotion_category": emotion},
     
-    @MiddlewareCommunicator.register("NativeObject", ICUB_DEFAULT_COMMUNICATOR,
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/facial_expressions",
                                      should_wait=False)
-    def update_facial_expressions(self, expression, part="LIGHTS", smoothing=None):
+    def update_facial_expressions(self, expression, part="LIGHTS", smoothing=None, _mware=MWARE):
         """
         Control facial expressions of the iCub
         :param expression: Expression abbreviation
@@ -488,32 +519,38 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             right_cam = cv2.cvtColor(right_cam, cv2.COLOR_BGR2RGB)
         if not self.headless:
             cv2.imshow("ICubCam", np.concatenate((left_cam, external_cam, right_cam), axis=1))
-            k = cv2.waitKey(33)
+            k = cv2.waitKey(30)
         else:
             k = None
 
-        switch_emotion, = self.acquire_facial_expressions(facial_expressions_port=self.facial_expressions_port, cv2_key=k)
+        switch_emotion, = self.acquire_facial_expressions(facial_expressions_port=self.FACIAL_EXPRESSIONS_PORT,
+                                                          cv2_key=k, _mware=self.MWARE)
         if switch_emotion is not None and isinstance(switch_emotion, dict):
-            self.update_facial_expressions(switch_emotion.get("emotion_category", None), part=switch_emotion.get("part", "LIGHTS"))
+            self.update_facial_expressions(switch_emotion.get("emotion_category", None),
+                                           part=switch_emotion.get("part", "LIGHTS"), _mware=self.MWARE)
 
-        move_robot, = self.acquire_head_eye_coordinates(head_eye_coordinates_port=self.head_eye_coordinates_port, cv2_key=k)
+        move_robot, = self.acquire_head_eye_coordinates(head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
+                                                        cv2_key=k, _mware=self.MWARE)
         if move_robot is not None and isinstance(move_robot, dict):
             self.update_gaze_speed(head_speed=move_robot.get("head_speed", (10.0, 10.0, 20.0)),
-                                eyes_speed=move_robot.get("eyes_speed", (10.0, 10.0, 20.0)))
+                                eyes_speed=move_robot.get("eyes_speed", (10.0, 10.0, 20.0)), _mware=self.MWARE)
             if move_robot.get("reset_gaze", False):
                 self.reset_gaze()
-            self.control_gaze(head=move_robot.get("head", (0, 0, 0)), eyes=move_robot.get("eyes", (0, 0, 0)))
+            self.control_gaze(head=move_robot.get("head", (0, 0, 0)), eyes=move_robot.get("eyes", (0, 0, 0)),
+                              _mware=self.mware)
 
-        move_robot, = self.receive_gaze_plane_coordinates(gaze_plane_coordinates_port=self.gaze_plane_coordinates_port)
+        move_robot, = self.receive_gaze_plane_coordinates(gaze_plane_coordinates_port=self.GAZE_PLANE_COORDINATES_PORT,
+                                                          _mware=self.MWARE)
         if move_robot is not None and isinstance(move_robot, dict):
             self.update_gaze_speed(head_speed=move_robot.get("head_speed", (10.0, 10.0, 20.0) if not self.ikingaze else 0.8),
-                                eyes_speed=move_robot.get("eyes_speed", (10.0, 10.0, 20.0) if not self.ikingaze else 0.5))
+                                   eyes_speed=move_robot.get("eyes_speed", (10.0, 10.0, 20.0) if not self.ikingaze else 0.5),
+                                   _mware=self.MWARE)
             if move_robot.get("reset_gaze", False):
                 self.reset_gaze()
             self.control_gaze_at_plane(xy=move_robot.get("xy", (0, 0)),
                                         limiting_consts_xy=move_robot.get("limiting_consts_xy", (0.3, 0.3)),
                                         control_head=move_robot.get("control_head", False if not self.ikingaze else True),
-                                        control_eyes=move_robot.get("control_eyes", True)),
+                                        control_eyes=move_robot.get("control_eyes", True), _mware=self.MWARE),
 
         return True
 
@@ -538,7 +575,12 @@ def parse_args():
     parser.add_argument("--facial_expressions_port", type=str, default="",
                         help="The port (topic) name used for receiving and transmitting facial expressions. "
                              "Setting the port name without --set_facial_expressions will only receive the facial expressions")
-
+    parser.add_argument("--mware", type=str,
+                        help="The middleware used for communication. "
+                             "This can be overriden by providing either of the following environment variables "
+                             "{WRAPYFI_DEFAULT_COMMUNICATOR, WRAPYFI_DEFAULT_MWARE, "
+                             "ICUB_DEFAULT_COMMUNICATOR, ICUB_DEFAULT_MWARE}. Defaults to 'yarp'",
+                        choices=MiddlewareCommunicator.get_communicators())
     return parser.parse_args()
 
 

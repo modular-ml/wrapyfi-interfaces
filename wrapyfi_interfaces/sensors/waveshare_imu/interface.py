@@ -1,40 +1,49 @@
 import os
 import time
-
+import argparse
 import json
-import serial
+import functools
 
+import serial
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
 WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_COMMUNICATOR", DEFAULT_COMMUNICATOR)
 WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_MWARE", WAVESHARE_IMU_DEFAULT_COMMUNICATOR)
 
-# TODO (fabawi): the ICM-20498 calibration script  https://github.com/WickedLukas/ICM20948/blob/master/ICM20948.cpp
-# TODO (fabawi): madgwick filter (post-proc)  https://github.com/WickedLukas/MadgwickAHRS/blob/master/MadgwickAHRS.cpp
-# TODO (fabawi): try out https://github.com/mad-lab-fau/imucal for gyroscope calibration
-# TODO (fabawi): otherwise, convert this (https://github.com/makerportal/mpu92-calibration) calibrator to work with
-#  ICM-20498 through serial instead of i2c since
-#   1. we cannot run this code on our pico
-#   2. need to run this on a different imu than the one proposed in the tutorial
-
 
 class WaveshareIMU(MiddlewareCommunicator):
-    def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200):
+    HEAD_EYE_COORDINATES_PORT = "/control_interface/head_eye_coordinates"
+    MWARE = WAVESHARE_IMU_DEFAULT_COMMUNICATOR
+
+    def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
+                 head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT,
+                 mware=MWARE):
         super(MiddlewareCommunicator, self).__init__()
+
+        self.MWARE = mware
+        self.HEAD_EYE_COORDINATES_PORT = head_eye_coordinates_port
+
         self.ser_device = ser_device
         self.ser_rate = ser_rate
+
         self.counter = 0
-        self.pico = None
+        if ser_device and ser_rate:
+            self.pico = serial.Serial(port=self.ser_device, baudrate=self.ser_rate, timeout=.1)
+        else:
+            self.pico = None
+        if self.HEAD_EYE_COORDINATES_PORT:
+            self.activate_communication(self.read_orientation, "publish")
+
+        self.build()
 
     def build(self):
-        self.pico = serial.Serial(port=self.ser_device, baudrate=self.ser_rate, timeout=.1)
+        self.read_orientation = functools.partial(self.read_orientation,
+                                                  head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
+                                                  _mware=self.MWARE)
 
-        self.activate_communication(self.read_orientation, "publish")
-
-    @MiddlewareCommunicator.register("NativeObject", WAVESHARE_IMU_DEFAULT_COMMUNICATOR, "WaveshareIMU",
-                                     "/waveshare_imu_reader/orientation",
-                                     carrier="mcast", should_wait=False)
-    def read_orientation(self):
+    @MiddlewareCommunicator.register("NativeObject", "$_mware", "WaveshareIMU",
+                                     "$head_eye_coordinates_port", should_wait=False)
+    def read_orientation(self, head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT, _mware=MWARE):
         try:
             sensor_data = self.pico.readline().decode("utf-8")
             imu_data = json.loads(sensor_data)
@@ -50,7 +59,7 @@ class WaveshareIMU(MiddlewareCommunicator):
         return 0.01
 
     def updateModule(self):
-        imu_data, = self.read_orientation()
+        imu_data, = self.read_orientation(head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT, _mware=self.MWARE)
         if imu_data is not None and isinstance(imu_data, dict):
             print(imu_data)
         else:
@@ -58,8 +67,6 @@ class WaveshareIMU(MiddlewareCommunicator):
         return True
 
     def runModule(self):
-        if self.pico is None:
-            self.build()
         while True:
             try:
                 self.updateModule()
@@ -72,6 +79,23 @@ class WaveshareIMU(MiddlewareCommunicator):
             self.pico.close()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ser_device", type=str, default="/dev/ttyACM0", help="Serial device to read from")
+    parser.add_argument("--ser_rate", type=int, default=115200, help="Serial baud rate")
+    parser.add_argument("--head_eye_coordinates_port", type=str, default="",
+                        help="The port (topic) name used for transmitting head and eye orientation coordinates")
+    parser.add_argument("--mware", type=str,
+                        help="The middleware used for communication. "
+                             "This can be overriden by providing either of the following environment variables "
+                             "{WRAPYFI_DEFAULT_COMMUNICATOR, WRAPYFI_DEFAULT_MWARE, "
+                             "WAVESHARE_IMU_DEFAULT_COMMUNICATOR, WAVESHARE_IMU_DEFAULT_MWARE}. "
+                             "Defaults to the Wrapyfi default communicator",
+                        choices=MiddlewareCommunicator.get_communicators())
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    imu = WaveshareIMU(ser_device="/dev/ttyACM0")
+    args = parse_args()
+    imu = WaveshareIMU(**vars(args))
     imu.runModule()

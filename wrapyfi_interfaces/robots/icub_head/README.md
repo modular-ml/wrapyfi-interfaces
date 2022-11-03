@@ -77,7 +77,13 @@ Install from the source by following the [official installation documentation](h
    ```
    export ICUB_DEFAULT_MWARE=ros
    ```
-
+   
+   or passing `--mware` argument to the `interface.py` file e.g.:
+   
+   ```
+    python3 wrapyfi/robots/icub_head/interface.py --mware ros ...
+   ```
+   
 ## Facial Expressions in Simulation
 
 The facial expressions do not run out-of-the-box. For compatibility with the `icub_head.py`, the following scripts need to 

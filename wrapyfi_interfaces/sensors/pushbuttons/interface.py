@@ -2,10 +2,11 @@ import os
 import time
 import threading
 import json
+import logging
 
 import cv2
 import serial
-
+import numpy as np
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
 PUSHBUTTON_DEFAULT_COMMUNICATOR = os.environ.get("PUSHBUTTON_DEFAULT_COMMUNICATOR", DEFAULT_COMMUNICATOR)
@@ -70,7 +71,7 @@ class PushButton(MiddlewareCommunicator):
             time.sleep(interval)
             sensor = self.arduino.readline().decode("utf-8")
             buttons = json.loads(sensor)
-            buttons.update(**{"timestamp": time.time())
+            buttons.update(**{"timestamp": time.time()})
         except:
             buttons = None
         return buttons,
@@ -79,7 +80,7 @@ class PushButton(MiddlewareCommunicator):
                                      "PushButton", "/push_button/command",
                                      carrier="", should_wait=False)
     def acquire_button_press(self, signal=None, cv2_key=None):
-        if signal=None and cv2_key is None:
+        if signal is None and cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
             logging.error("controlling button in headless mode not yet supported")
             return None,
@@ -165,15 +166,17 @@ class PushButton(MiddlewareCommunicator):
             textsize = cv2.getTextSize(text, font, 1, 2)[0]
 
             # get coords based on boundary
-            textX = (img.shape[1] - textsize[0]) / 2
-            textY = (img.shape[0] + textsize[1]) / 2
+            textX = (instruction_window.shape[1] - textsize[0]) / 2
+            textY = (instruction_window.shape[0] + textsize[1]) / 2
 
             # add text centered on image
-            cv2.putText(img, text, (textX, textY ), font, 1, (255, 255, 255), 2)
+            cv2.putText(instruction_window, text, (textX, textY ), font, 1, (255, 255, 255), 2)
             cv2.imshow("PushButton", instruction_window)
+            k = cv2.waitKey(33)
         else:
-            k=None
+            k = None
         button_cmd, = self.acquire_button_press(cv2_key=k)
+
         if button_cmd is not None and isinstance(button_cmd, dict):
             self.update_button_light(button_cmd)
         return True
