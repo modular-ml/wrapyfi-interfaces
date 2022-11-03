@@ -7,13 +7,14 @@ import functools
 import serial
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
+
 WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_COMMUNICATOR", DEFAULT_COMMUNICATOR)
 WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_MWARE", WAVESHARE_IMU_DEFAULT_COMMUNICATOR)
 
 
 class WaveshareIMU(MiddlewareCommunicator):
-    HEAD_EYE_COORDINATES_PORT = "/control_interface/head_eye_coordinates"
     MWARE = WAVESHARE_IMU_DEFAULT_COMMUNICATOR
+    HEAD_EYE_COORDINATES_PORT = "/control_interface/head_eye_coordinates"
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
                  head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT,
@@ -37,9 +38,7 @@ class WaveshareIMU(MiddlewareCommunicator):
         self.build()
 
     def build(self):
-        self.read_orientation = functools.partial(self.read_orientation,
-                                                  head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
-                                                  _mware=self.MWARE)
+        WaveshareIMU.read_orientation.__defaults__ = (self.HEAD_EYE_COORDINATES_PORT, self.MWARE)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware", "WaveshareIMU",
                                      "$head_eye_coordinates_port", should_wait=False)
@@ -85,7 +84,7 @@ def parse_args():
     parser.add_argument("--ser_rate", type=int, default=115200, help="Serial baud rate")
     parser.add_argument("--head_eye_coordinates_port", type=str, default="",
                         help="The port (topic) name used for transmitting head and eye orientation coordinates")
-    parser.add_argument("--mware", type=str,
+    parser.add_argument("--mware", type=str, default=WAVESHARE_IMU_DEFAULT_COMMUNICATOR,
                         help="The middleware used for communication. "
                              "This can be overriden by providing either of the following environment variables "
                              "{WRAPYFI_DEFAULT_COMMUNICATOR, WRAPYFI_DEFAULT_MWARE, "

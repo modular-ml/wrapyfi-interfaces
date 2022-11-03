@@ -6,7 +6,7 @@ import functools
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
 
-class FacialExpressionInterface(MiddlewareCommunicator):
+class FacialExpressionsInterface(MiddlewareCommunicator):
     PORT_OUT = "/control_interface/facial_expressions_out"
     MWARE_OUT = DEFAULT_COMMUNICATOR
     PORT_IN = "/control_interface/facial_expressions_in"
@@ -22,7 +22,7 @@ class FacialExpressionInterface(MiddlewareCommunicator):
                  mware_out=DEFAULT_COMMUNICATOR,
                  facial_expressions_port_in="/control_interface/facial_expressions_out",
                  mware_in=DEFAULT_COMMUNICATOR, should_wait=SHOULD_WAIT):
-        super(FacialExpressionInterface, self).__init__()
+        super(FacialExpressionsInterface, self).__init__()
 
         self.SHOULD_WAIT = should_wait
         if facial_expressions_port_out and mware_out:
@@ -36,16 +36,10 @@ class FacialExpressionInterface(MiddlewareCommunicator):
             self.activate_communication("receive_emotion", "listen")
 
     def build(self):
-        self.transmit_emotion = functools.partial(self.transmit_emotion,
-                                                  facial_expressions_port=self.PORT_OUT,
-                                                  should_wait=self.SHOULD_WAIT,
-                                                  _mware=self.MWARE_OUT)
-        self.receive_emotion = functools.partial(self.receive_emotion,
-                                                 facial_expressions_port=self.PORT_IN,
-                                                 should_wait=self.SHOULD_WAIT,
-                                                 _mware=self.MWARE_IN)
+        FacialExpressionsInterface.transmit_emotion.__defaults__ = (self.PORT_OUT, self.SHOULD_WAIT, self.MWARE_OUT)
+        FacialExpressionsInterface.receive_emotion.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
-    @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionInterface",
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
                                      "$facial_expressions_port", should_wait="$should_wait")
     def transmit_emotion(self, emotion_category, emotion_continuous, emotion_index,
                          facial_expressions_port=PORT_OUT, should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
@@ -58,7 +52,7 @@ class FacialExpressionInterface(MiddlewareCommunicator):
         else:
             return None,
 
-    @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionInterface",
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
                                         "$facial_expressions_port", should_wait="$should_wait")
     def receive_emotion(self, facial_expressions_port=PORT_IN, should_wait=SHOULD_WAIT, _mware=MWARE_IN, **kwargs):
         return None,
@@ -72,7 +66,7 @@ class FacialExpressionInterface(MiddlewareCommunicator):
                                            _mware=self.MWARE_IN)
         if emotion_in:
             print(f"Received emotion: {emotion_in}")
-            time.sleep(self.getPeriod() / 2)
+            time.sleep(self.getPeriod())
             emotion_out = self.transmit_emotion(emotion_category=emotion_in["emotion_category"],
                                                 emotion_continuous=emotion_in["emotion_continuous"],
                                                 emotion_index=emotion_in["emotion_index"],
@@ -81,12 +75,12 @@ class FacialExpressionInterface(MiddlewareCommunicator):
                                                 _mware=self.MWARE_OUT)
             if emotion_out:
                 print(f"Sent emotion: {emotion_out}")
+                time.sleep(self.getPeriod())
 
     def runModule(self):
         while True:
             try:
                 self.updateModule()
-                time.sleep(self.getPeriod() / 2)
             except:
                 break
 
@@ -102,10 +96,12 @@ def parse_args():
     parser.add_argument("--mware_in", type=str, default=DEFAULT_COMMUNICATOR,
                         help="Middleware to listen to facial expressions",
                         choices=MiddlewareCommunicator.get_communicators())
+    parser.add_argument("--should_wait", action="store_true", help="Wait for at least one listener before publishing "
+                                                                   "or a publisher before listening")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    fer = FacialExpressionInterface(**vars(args))
+    fer = FacialExpressionsInterface(**vars(args))
     fer.runModule()

@@ -192,24 +192,16 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self.build()
 
     def build(self):
-        self.acquire_head_eye_coordinates = functools.partial(self.acquire_head_eye_coordinates,
-                                                              head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
-                                                              _mware=self.MWARE)
-        self.acquire_facial_expressions = functools.partial(self.acquire_facial_expressions,
-                                                           facial_expressions_port=self.FACIAL_EXPRESSIONS_PORT,
-                                                           _mware=self.MWARE)
-        self.receive_gaze_plane_coordinates = functools.partial(self.receive_gaze_plane_coordinates,
-                                                                gaze_plane_coordinates_port=self.GAZE_PLANE_COORDINATES_PORT,
-                                                                _mware=self.MWARE)
-        self.receive_images = functools.partial(self.receive_images,
-                                                img_width=self.CAP_PROP_FRAME_WIDTH,
-                                                img_height=self.CAP_PROP_FRAME_HEIGHT)
-        self.reset_gaze = functools.partial(self.reset_gaze, _mware=self.MWARE)
-        self.update_gaze_speed = functools.partial(self.update_gaze_speed, _mware=self.MWARE)
-        self.control_gaze = functools.partial(self.control_gaze, _mware=self.MWARE)
-        self.wait_for_gaze = functools.partial(self.wait_for_gaze, _mware=self.MWARE)
-        self.control_gaze_at_plane = functools.partial(self.control_gaze_at_plane, _mware=self.MWARE)
-        self.update_facial_expressions = functools.partial(self.update_facial_expressions, _mware=self.MWARE)
+        ICub.acquire_head_eye_coordinates.__defaults__ = (self.HEAD_EYE_COORDINATES_PORT, None, self.MWARE)
+        ICub.receive_gaze_plane_coordinates.__defaults__ = (self.GAZE_PLANE_COORDINATES_PORT, self.MWARE)
+        ICub.wait_for_gaze.__defaults__ = (True, self.MWARE)
+        ICub.reset_gaze.__defaults__ = (self.MWARE,)
+        ICub.update_gaze_speed.__defaults__ = ((10.0, 10.0, 20.0), (20.0, 20.0, 20.0), self.MWARE)
+        ICub.control_gaze.__defaults__ = ((0, 0, 0), (0, 0, 0), self.MWARE)
+        ICub.control_gaze_at_plane.__defaults__ = ((0, 0,), (0.3, 0.3), True, True, self.MWARE)
+        ICub.acquire_facial_expressions.__defaults__ = (self.FACIAL_EXPRESSIONS_PORT, None, self.MWARE)
+        ICub.update_facial_expressions.__defaults__ = ("LIGHTS", None, self.MWARE)
+        ICub.receive_images.__defaults__ = (self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT, True)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$head_eye_coordinates_port",
@@ -575,7 +567,7 @@ def parse_args():
     parser.add_argument("--facial_expressions_port", type=str, default="",
                         help="The port (topic) name used for receiving and transmitting facial expressions. "
                              "Setting the port name without --set_facial_expressions will only receive the facial expressions")
-    parser.add_argument("--mware", type=str,
+    parser.add_argument("--mware", type=str, default=ICUB_DEFAULT_COMMUNICATOR,
                         help="The middleware used for communication. "
                              "This can be overriden by providing either of the following environment variables "
                              "{WRAPYFI_DEFAULT_COMMUNICATOR, WRAPYFI_DEFAULT_MWARE, "

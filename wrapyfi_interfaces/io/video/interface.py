@@ -4,8 +4,9 @@ import argparse
 import time
 from queue import Queue
 from threading import Thread
-
 import os
+import functools
+
 import cv2
 import numpy as np
 
@@ -44,16 +45,23 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
         Calling retrieve() and read() automatically invokes acquire_image with constructor arguments (e.g. image_width)
         automatically passed
     """
+    MWARE = CAMERA_DEFAULT_COMMUNICATOR
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
+    CAP_FEED_PORT = "/video_reader/video_feed"
+    CAP_FEED_CARRIER = ""
     SHOULD_WAIT = False
 
-    def __init__(self, cap_source, cap_feed_port="/video_reader/video_feed", cap_feed_carrier="",
+    def __init__(self, cap_source, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
                  headless=False, should_wait=False, multithreading=True, queue_size=10, force_resize=False,
-                 img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, **kwargs):
+                 img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, mware=MWARE, **kwargs):
         MiddlewareCommunicator.__init__(self)
 
-        VideoCapture.SHOULD_WAIT = should_wait
+        self.MWARE = mware
+        self.CAP_FEED_PORT = cap_feed_port
+        self.CAP_FEED_CARRIER = cap_feed_carrier
+        self.SHOULD_WAIT = should_wait
+
         self.multithreading = multithreading
         self.force_resize = force_resize
 
@@ -83,8 +91,6 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             self.fps = 1
 
         self.headless = headless
-        self.cap_feed_port = cap_feed_port
-        self.cap_feed_carrier = cap_feed_carrier
         self.cap_source = cap_source
 
         if cap_feed_port:
@@ -97,6 +103,13 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             self.thread = Thread(target=self.update, args=())
             self.thread.daemon = True
             self.thread.start()
+
+        self.build()
+
+    def build(self):
+        VideoCapture.acquire_image.__defaults__ = (self.CAP_FEED_PORT, self.CAP_FEED_CARRIER,
+                                                   self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT,
+                                                   self.SHOULD_WAIT, self.MWARE)
 
     def update(self, **kwargs):
         while True:
@@ -115,11 +128,12 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
 
         self.release(force=False)
 
-    @MiddlewareCommunicator.register("Image", CAMERA_DEFAULT_COMMUNICATOR, "VideoCapture", "$cap_feed_port",
-                                     carrier="$cap_feed_carrier", width="$img_width", height="$img_height",rgb=True,
+    @MiddlewareCommunicator.register("Image", "$_mware", "VideoCapture", "$cap_feed_port",
+                                     carrier="$cap_feed_carrier", width="$img_width", height="$img_height", rgb=True,
                                      should_wait="$should_wait")
-    def acquire_image(self, cap_feed_port="/video_reader/video_feed", cap_feed_carrier="",
-                      img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, should_wait=SHOULD_WAIT, **kwargs):
+    def acquire_image(self, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
+                      img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, should_wait=SHOULD_WAIT,
+                      _mware=MWARE, **kwargs):
         if self.isOpened():
             if kwargs.get("_internal_call", False):
                 grabbed = kwargs.get("_grabbed", None)
@@ -158,9 +172,9 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             else:
                 grabbed, img = super().read(**kwargs)
             if grabbed:
-                img, = self.acquire_image(cap_feed_port=self.cap_feed_port, cap_feed_carrier=self.cap_feed_carrier,
-                                   img_width=self.img_width, img_height=self.img_height,
-                                   _internal_call=True, _grabbed=grabbed, _img=img)
+                img, = self.acquire_image(cap_feed_port=self.CAP_FEED_PORT, cap_feed_carrier=self.CAP_FEED_CARRIER,
+                                          img_width=self.img_width, img_height=self.img_height,
+                                          _internal_call=True, _grabbed=grabbed, _img=img, _mware=self.MWARE)
             return grabbed, img
 
     def retrieve(self, **kwargs):
@@ -169,9 +183,9 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             return grabbed, img
         else:
             grabbed, img = super().retrieve(**kwargs)
-            img, = self.acquire_image(cap_feed_port=self.cap_feed_port, cap_feed_carrier=self.cap_feed_carrier,
+            img, = self.acquire_image(cap_feed_port=self.CAP_FEED_PORT, cap_feed_carrier=self.CAP_FEED_CARRIER,
                                       img_width=self.img_width, img_height=self.img_height,
-                                      _internal_call=True, _grabbed=grabbed, _img=img)
+                                      _internal_call=True, _grabbed=grabbed, _img=img, _mware=self.MWARE)
             return grabbed, img
 
     def getPeriod(self):
@@ -221,17 +235,24 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
 
 
 class VideoCaptureReceiver(VideoCapture):
+    MWARE = CAMERA_DEFAULT_COMMUNICATOR
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
+    CAP_FEED_PORT = "/video_reader/video_feed"
+    CAP_FEED_CARRIER = ""
+    SHOULD_WAIT = False
 
-    def __init__(self, cap_feed_port="/video_reader/video_feed", cap_feed_carrier="",
-                 headless=False, should_wait=False, multithreading=False,
-                 img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, **kwargs):
+    def __init__(self, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
+                 headless=False, should_wait=SHOULD_WAIT, multithreading=False,
+                 img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, mware=MWARE, **kwargs):
         VideoCapture.__init__(self, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
                               headless=headless, should_wait=should_wait, img_width=False, img_height=False,
-                              fps=False, multithreading=False, **kwargs)
+                              fps=False, multithreading=False, mware=mware, **kwargs)
 
-        self.cap_feed_port = cap_feed_port
+        self.MWARE = mware
+        self.CAP_FEED_PORT = cap_feed_port
+        self.CAP_FEED_CARRIER = cap_feed_carrier
+        self.SHOULD_WAIT = should_wait
 
         if img_width:
             self.img_width = img_width
@@ -267,6 +288,13 @@ class VideoCaptureReceiver(VideoCapture):
 
         self.opened = True
 
+        self.build()
+
+    def build(self):
+        VideoCaptureReceiver.acquire_image.__defaults__ = (self.CAP_FEED_PORT, self.CAP_FEED_CARRIER,
+                                                           self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT,
+                                                           self.SHOULD_WAIT, self.MWARE)
+
     def retrieve(self, **kwargs):
         try:
             frame_index = self.cap_props["fpos"]
@@ -301,6 +329,9 @@ class VideoCaptureReceiver(VideoCapture):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--headless", action="store_true", help="Disable CV2 GUI")
+    parser.add_argument("--mware", type=str, default=CAMERA_DEFAULT_COMMUNICATOR,
+                        help="Middleware to listen to or publish images",
+                        choices=MiddlewareCommunicator.get_communicators())
     parser.add_argument("--should_wait", action="store_true", help="Wait for at least one listener before publishing")
     parser.add_argument("--multithreading", action="store_true", help="Enable multithreading for publishing capturer")
     parser.add_argument("--queue_size", type=int, default=10, help="Queue size for multithreading")
