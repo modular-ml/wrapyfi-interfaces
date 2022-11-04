@@ -2,7 +2,7 @@ import os
 import time
 import argparse
 import logging
-import functools
+from collections import deque
 
 import cv2
 import numpy as np
@@ -66,6 +66,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     HEAD_EYE_COORDINATES_PORT = "/control_interface/head_eye_coordinates"
     GAZE_PLANE_COORDINATES_PORT = "/control_interface/gaze_plane_coordinates"
     FACIAL_EXPRESSIONS_PORT = "/control_interface/facial_expressions"
+    # constants
+    FACIAL_EXPRESSIONS_QUEUE_SIZE = 50
+    FACIAL_EXPRESSION_SMOOTHING_WINDOW = 6
 
     def __init__(self, simulation=False, headless=False, get_cam_feed=True,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
@@ -123,6 +126,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             else:
                 logging.error("pexpect must be installed to control the emotion interface")
                 self.activate_communication(self.update_facial_expressions, "disable")
+
+            self.last_expression = ["", ""]  # (emotion part on the robot's face , emotional expression category)
+            self.expressions_queue = deque(maxlen=self.FACIAL_EXPRESSIONS_QUEUE_SIZE)
         else:
             self.activate_communication(self.update_facial_expressions, "disable")
                 
@@ -455,7 +461,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/facial_expressions",
                                      should_wait=False)
-    def update_facial_expressions(self, expression, part="LIGHTS", smoothing=None, _mware=MWARE):
+    def update_facial_expressions(self, expression, part="LIGHTS", smoothing="mode", _mware=MWARE):
         """
         Control facial expressions of the iCub
         :param expression: Expression abbreviation
@@ -469,7 +475,16 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             expression = expression[-1]
         expression = EMOTION_LOOKUP.get(expression, expression)
 
-        if part == "LIGHTS":
+        if smoothing == "mode":
+            self.expressions_queue.append(expression)
+            transmitted_expression = mode_smoothing_filter(list(self.expressions_queue),
+                                                      window_length=self.FACIAL_EXPRESSION_SMOOTHING_WINDOW)
+        else:
+            transmitted_expression = expression
+
+        if self.last_expression[0] == part and self.last_expression[1] == transmitted_expression:
+            pass
+        elif part == "LIGHTS":
             self.client.sendline(f"set leb {expression}")
             self.client.expect(">>")
             self.client.sendline(f"set reb {expression}")
@@ -479,7 +494,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         else:
             self.client.sendline(f"set {part} {expression}")
             self.client.expect(">>")
-            
+
+        self.last_expression[0] = part
+        self.last_expression[1] = transmitted_expression
+
         return {"topic": "logging_facial_expressions",
                 "timestamp": time.time(), 
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},

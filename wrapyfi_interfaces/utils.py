@@ -18,7 +18,8 @@ def cartesian_to_spherical(xyz):
   return ptr
   
 
-def mode_smoothing_filter(time_series, alpha=0.22, beta=0.1, window_length=7):
+def mode_smoothing_filter(time_series, alpha=0.22, beta=0.1, window_length=6):
+  # TODO (fabawi): consider level and trend for smoothing
   import scipy.stats
   #behave = ["stand", "stand", "stand", "stand", "lying", "lying", "eating"]
   most_freq_val = lambda x: scipy.stats.mode(x)[0][0]
