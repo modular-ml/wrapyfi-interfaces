@@ -39,9 +39,9 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
         FacialExpressionsInterface.receive_emotion.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
-                                     "$facial_expressions_port", should_wait="$should_wait")
+                                     "$_facial_expressions_port", should_wait="$_should_wait")
     def transmit_emotion(self, emotion_category, emotion_continuous, emotion_index,
-                         facial_expressions_port=PORT_OUT, should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
+                         facial_expressions_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
         return {"topic": facial_expressions_port.split("/")[-1],
                 "emotion_category": emotion_category,
                 "emotion_continuous": emotion_continuous,
@@ -49,8 +49,8 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
                 "timestamp": time.time()},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
-                                        "$facial_expressions_port", should_wait="$should_wait")
-    def receive_emotion(self, facial_expressions_port=PORT_IN, should_wait=SHOULD_WAIT, _mware=MWARE_IN, **kwargs):
+                                        "$facial_expressions_port", should_wait="$_should_wait")
+    def receive_emotion(self, facial_expressions_port=PORT_IN, _should_wait=SHOULD_WAIT, _mware=MWARE_IN, **kwargs):
         return None,
 
     def getPeriod(self):
@@ -58,7 +58,7 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
 
     def updateModule(self):
         emotion_in, = self.receive_emotion(facial_expressions_port=self.PORT_IN,
-                                           should_wait=self.SHOULD_WAIT,
+                                           _should_wait=self.SHOULD_WAIT,
                                            _mware=self.MWARE_IN)
         if emotion_in is not None:
             print(f"Received emotion: {emotion_in}")
@@ -67,7 +67,7 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
                                                 emotion_continuous=emotion_in["emotion_continuous"],
                                                 emotion_index=emotion_in["emotion_index"],
                                                 facial_expressions_port=self.PORT_OUT,
-                                                should_wait=self.SHOULD_WAIT,
+                                                _should_wait=self.SHOULD_WAIT,
                                                 _mware=self.MWARE_OUT)
             if emotion_out is not None:
                 print(f"Sent emotion: {emotion_out}")

@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
-from wrapyfi_interfaces.utils import str_or_int
+from wrapyfi_interfaces.utils.helpers import str_or_int
 
 CAMERA_DEFAULT_COMMUNICATOR = os.environ.get("CAMERA_DEFAULT_COMMUNICATOR", DEFAULT_COMMUNICATOR)
 CAMERA_DEFAULT_COMMUNICATOR = os.environ.get("CAMERA_DEFAULT_MWARE", CAMERA_DEFAULT_COMMUNICATOR)
@@ -130,10 +130,10 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
 
     @MiddlewareCommunicator.register("Image", "$_mware", "VideoCapture", "$cap_feed_port",
                                      carrier="$cap_feed_carrier", width="$img_width", height="$img_height", rgb=True,
-                                     should_wait="$should_wait")
+                                     should_wait="$_should_wait")
     def acquire_image(self, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
-                      img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, should_wait=SHOULD_WAIT,
-                      _mware=MWARE, **kwargs):
+                      img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
+                      _should_wait=SHOULD_WAIT, _mware=MWARE, **kwargs):
         if self.isOpened():
             if kwargs.get("_internal_call", False):
                 grabbed = kwargs.get("_grabbed", None)
@@ -174,7 +174,8 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             if grabbed:
                 img, = self.acquire_image(cap_feed_port=self.CAP_FEED_PORT, cap_feed_carrier=self.CAP_FEED_CARRIER,
                                           img_width=self.img_width, img_height=self.img_height,
-                                          _internal_call=True, _grabbed=grabbed, _img=img, _mware=self.MWARE)
+                                          _internal_call=True, _grabbed=grabbed, _img=img,
+                                          _mware=self.MWARE, _should_wait=self.SHOULD_WAIT)
             return grabbed, img
 
     def retrieve(self, **kwargs):
@@ -185,7 +186,8 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             grabbed, img = super().retrieve(**kwargs)
             img, = self.acquire_image(cap_feed_port=self.CAP_FEED_PORT, cap_feed_carrier=self.CAP_FEED_CARRIER,
                                       img_width=self.img_width, img_height=self.img_height,
-                                      _internal_call=True, _grabbed=grabbed, _img=img, _mware=self.MWARE)
+                                      _internal_call=True, _grabbed=grabbed, _img=img,
+                                      _mware=self.MWARE, _should_wait=self.SHOULD_WAIT)
             return grabbed, img
 
     def getPeriod(self):
@@ -272,15 +274,17 @@ class VideoCaptureReceiver(VideoCapture):
             cv2.CAP_PROP_FRAME_HEIGHT: "img_height"
         }
 
-        self.cap_props = {"cap_feed_port": cap_feed_port,
-                          "cap_feed_carrier": cap_feed_carrier,
+        self.cap_props = {"cap_feed_port": self.CAP_FEED_PORT,
+                          "cap_feed_carrier": self.CAP_FEED_CARRIER,
                           "fpos": 0,
                           "fps": fps,
                           "msec": 1 / fps,
                           "fpos_msec": 0,
                           "fcount": 0,
                           "img_width": self.CAP_PROP_FRAME_WIDTH,
-                          "img_height": self.CAP_PROP_FRAME_HEIGHT}
+                          "img_height": self.CAP_PROP_FRAME_HEIGHT,
+                          "_should_wait": self.SHOULD_WAIT,
+                          "_mware": self.MWARE}
 
         # control the listening properties from within the app
         if cap_feed_port:

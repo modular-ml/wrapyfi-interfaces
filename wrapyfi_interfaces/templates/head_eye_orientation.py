@@ -39,9 +39,9 @@ class OrientationInterface(MiddlewareCommunicator):
         OrientationInterface.receive_orientation.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
-                                     "$head_eyes_orientation_port", should_wait="$should_wait")
+                                     "$head_eyes_orientation_port", should_wait="$_should_wait")
     def transmit_orientation(self, head, eyes, head_speed, eyes_speed, reset_gaze,
-                         head_eyes_orientation_port=PORT_OUT, should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
+                         head_eyes_orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
         return {"topic": head_eyes_orientation_port.split("/")[-1],
                 "head": head,
                 "eyes": eyes,
@@ -51,8 +51,8 @@ class OrientationInterface(MiddlewareCommunicator):
                 "timestamp": time.time()},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
-                                        "$head_eyes_orientation_port", should_wait="$should_wait")
-    def receive_orientation(self, head_eyes_orientation_port=PORT_IN, should_wait=SHOULD_WAIT, _mware=MWARE_IN,
+                                        "$head_eyes_orientation_port", should_wait="$_should_wait")
+    def receive_orientation(self, head_eyes_orientation_port=PORT_IN, _should_wait=SHOULD_WAIT, _mware=MWARE_IN,
                             **kwargs):
         return None,
 
@@ -61,7 +61,7 @@ class OrientationInterface(MiddlewareCommunicator):
 
     def updateModule(self):
         orientation_in, = self.receive_orientation(head_eyes_orientation_port=self.PORT_IN,
-                                               should_wait=self.SHOULD_WAIT,
+                                               _should_wait=self.SHOULD_WAIT,
                                                _mware=self.MWARE_IN)
         if orientation_in is not None:
             print(f"Received emotion: {orientation_in}")
@@ -72,7 +72,7 @@ class OrientationInterface(MiddlewareCommunicator):
                                                         eyes_speed=orientation_in["eyes_speed"],
                                                         reset_gaze=orientation_in["reset_gaze"],
                                                         head_eyes_orientation_port=self.PORT_OUT,
-                                                        should_wait=self.SHOULD_WAIT,
+                                                        _should_wait=self.SHOULD_WAIT,
                                                         _mware=self.MWARE_OUT)
             if orientation_out is not None:
                 print(f"Sent emotion: {orientation_out}")

@@ -15,7 +15,8 @@ except ImportError:
     HAVE_PEXPECT = False
     
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
-from wrapyfi_interfaces.utils import cartesian_to_spherical, mode_smoothing_filter
+from wrapyfi_interfaces.utils.transformations import cartesian_to_spherical
+from wrapyfi_interfaces.utils.filters import mode_smoothing_filter
 
 
 ICUB_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_COMMUNICATOR", "yarp")
@@ -262,7 +263,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             else:
                 logging.info(cv2_key)  # else print its value
 
-            return {"topic": "head_eye_coordinates",
+            return {"topic": head_eye_coordinates_port.split("/")[-1],
                     "timestamp": time.time(),
                     "head": self._curr_head,
                     "eyes": self._curr_eyes},
@@ -454,7 +455,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             else:
                 logging.info(cv2_key)  # else print its value
                 return None,
-            return {"topic": "facial_expressions",
+            return {"topic": facial_expressions_port.split("/")[-1],
                     "timestamp": time.time(),
                     "emotion_category": emotion},
     
@@ -503,13 +504,13 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},
 
     @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$cam_world_port",
-                                     width="$img_width", height="$img_height", rgb="$rgb")
+                                     width="$img_width", height="$img_height", rgb="$_rgb")
     @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$cam_left_port",
-                                     width="$img_width", height="$img_height", rgb="$rgb")
+                                     width="$img_width", height="$img_height", rgb="$_rgb")
     @MiddlewareCommunicator.register("Image", "yarp", "ICub", "$cam_right_port",
-                                     width="$img_width", height="$img_height", rgb="$rgb")
+                                     width="$img_width", height="$img_height", rgb="$_rgb")
     def receive_images(self, cam_world_port, cam_left_port, cam_right_port,
-                       img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, rgb=True):
+                       img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, _rgb=True):
         external_cam, left_cam, right_cam = None, None, None
         return external_cam, left_cam, right_cam
 

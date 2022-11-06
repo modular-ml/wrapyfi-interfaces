@@ -46,7 +46,7 @@ class WaveshareIMU(MiddlewareCommunicator):
         try:
             sensor_data = self.pico.readline().decode("utf-8")
             imu_data = json.loads(sensor_data)
-            imu_data.update(topic="imu_orientation",
+            imu_data.update(topic=head_eye_coordinates_port.split("/")[-1],
                             world_index=self.counter,
                             timestamp=time.time())
             self.counter += 1

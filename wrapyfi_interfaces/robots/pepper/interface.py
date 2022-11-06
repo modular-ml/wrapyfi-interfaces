@@ -8,9 +8,9 @@ import cv2
 import numpy as np
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
-from wrapyfi_interfaces.utils import mode_smoothing_filter
+from wrapyfi_interfaces.utils.filters import mode_smoothing_filter
 
-PEPPER_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_COMMUNICATOR", "yarp")
+PEPPER_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_COMMUNICATOR", "ros")
 PEPPER_DEFAULT_COMMUNICATOR = os.environ.get("WRAPYFI_DEFAULT_MWARE", PEPPER_DEFAULT_COMMUNICATOR)
 PEPPER_DEFAULT_COMMUNICATOR = os.environ.get("PEPPER_DEFAULT_COMMUNICATOR", PEPPER_DEFAULT_COMMUNICATOR)
 PEPPER_DEFAULT_COMMUNICATOR = os.environ.get("PEPPER_DEFAULT_MWARE", PEPPER_DEFAULT_COMMUNICATOR)
@@ -148,7 +148,7 @@ class Pepper(MiddlewareCommunicator):
             else:
                 logging.info(cv2_key)  # else print its value
                 return None,
-            return {"topic": "facial_expressions",
+            return {"topic": facial_expressions_port.split("/")[-1],
                     "timestamp": time.time(),
                     "emotion_category": emotion},
 
@@ -193,13 +193,13 @@ class Pepper(MiddlewareCommunicator):
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},
 
     @MiddlewareCommunicator.register("Image", "ros", "Pepper", "$cam_world_port",
-                                     width="$img_width", height="$img_height", rgb="$rgb")
+                                     width="$img_width", height="$img_height", _rgb="$rgb")
     @MiddlewareCommunicator.register("Image", "ros", "Pepper", "$cam_left_port",
-                                     width="$img_width", height="$img_height", rgb="$rgb")
+                                     width="$img_width", height="$img_height", _rgb="$rgb")
     @MiddlewareCommunicator.register("Image", "ros", "Pepper", "$cam_right_port",
-                                     width="$img_width", height="$img_height", rgb="$rgb")
+                                     width="$img_width", height="$img_height", _rgb="$rgb")
     def receive_images(self, cam_world_port, cam_left_port, cam_right_port,
-                       img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, rgb=True):
+                       img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, _rgb=True):
         external_cam, left_cam, right_cam = None, None, None
         return external_cam, left_cam, right_cam
 
