@@ -38,11 +38,11 @@ Run:
     
     # Alternative 1 (simulation)
     # Ensure that the `iCub_SIM` is running in a standalone terminal
-    # Listener shows images and coordinates are published without Wrapyfi"s utilities
+    # Listener shows images and coordinates are published without Wrapyfi's utilities
     python3 icub_head.py --simulation --get_cam_feed --control_head --control_expressions
     
     # Alternative 2 (physical robot)
-    # Listener shows images and coordinates are published without Wrapyfi"s utilities
+    # Listener shows images and coordinates are published without Wrapyfi's utilities
     python3 icub_head.py --get_cam_feed --control_head --control_expressions
     
 """

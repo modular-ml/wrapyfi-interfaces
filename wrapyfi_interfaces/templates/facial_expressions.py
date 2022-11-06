@@ -1,7 +1,6 @@
 import os
 import time
 import argparse
-import functools
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
@@ -18,10 +17,10 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
     This template acts as a bridge between different middleware and/or ports (topics).
     """
     def __init__(self,
-                 facial_expressions_port_out="/control_interface/facial_expressions_in",
-                 mware_out=DEFAULT_COMMUNICATOR,
-                 facial_expressions_port_in="/control_interface/facial_expressions_out",
-                 mware_in=DEFAULT_COMMUNICATOR, should_wait=SHOULD_WAIT):
+                 facial_expressions_port_out=PORT_OUT,
+                 mware_out=MWARE_OUT,
+                 facial_expressions_port_in=PORT_IN,
+                 mware_in=MWARE_IN, should_wait=SHOULD_WAIT):
         super(FacialExpressionsInterface, self).__init__()
 
         self.SHOULD_WAIT = should_wait
@@ -43,14 +42,11 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
                                      "$facial_expressions_port", should_wait="$should_wait")
     def transmit_emotion(self, emotion_category, emotion_continuous, emotion_index,
                          facial_expressions_port=PORT_OUT, should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
-        if emotion_category is not None:
-            return {"topic": "facial_expressions",
-                    "emotion_category": emotion_category,
-                    "emotion_continuous": emotion_continuous,
-                    "emotion_index": emotion_index,
-                    "timestamp": time.time()},
-        else:
-            return None,
+        return {"topic": facial_expressions_port.split("/")[-1],
+                "emotion_category": emotion_category,
+                "emotion_continuous": emotion_continuous,
+                "emotion_index": emotion_index,
+                "timestamp": time.time()},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
                                         "$facial_expressions_port", should_wait="$should_wait")
@@ -64,7 +60,7 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
         emotion_in, = self.receive_emotion(facial_expressions_port=self.PORT_IN,
                                            should_wait=self.SHOULD_WAIT,
                                            _mware=self.MWARE_IN)
-        if emotion_in:
+        if emotion_in is not None:
             print(f"Received emotion: {emotion_in}")
             time.sleep(self.getPeriod())
             emotion_out = self.transmit_emotion(emotion_category=emotion_in["emotion_category"],
@@ -73,7 +69,7 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
                                                 facial_expressions_port=self.PORT_OUT,
                                                 should_wait=self.SHOULD_WAIT,
                                                 _mware=self.MWARE_OUT)
-            if emotion_out:
+            if emotion_out is not None:
                 print(f"Sent emotion: {emotion_out}")
                 time.sleep(self.getPeriod())
 
