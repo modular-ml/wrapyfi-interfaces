@@ -548,7 +548,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             if move_robot.get("reset_gaze", False):
                 self.reset_gaze()
             self.control_gaze(head=move_robot.get("head", (0, 0, 0)), eyes=move_robot.get("eyes", (0, 0, 0)),
-                              _mware=self.mware)
+                              _mware=self.MWARE)
 
         move_robot, = self.receive_gaze_plane_coordinates(gaze_plane_coordinates_port=self.GAZE_PLANE_COORDINATES_PORT,
                                                           _mware=self.MWARE)
