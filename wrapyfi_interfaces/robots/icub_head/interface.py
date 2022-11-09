@@ -49,14 +49,17 @@ Run:
 """
 
 EMOTION_LOOKUP = {
-    "Neutral": "neu",
-    "Happy": "hap",
-    "Sad": "sad",
-    "Surprise": "sur",
-    "Fear": "shy",
-    "Disgust": "cun",
-    "Anger": "ang",
-    "Contempt": "evi"
+    "Neutral": [("LIGHTS", "neu")],
+    "Happy": [("LIGHTS", "hap")],
+    "Sad": [("LIGHTS", "sad")],
+    "Surprise": [("LIGHTS", "sur")],
+    "Fear": [("raw", "L04"), ("raw", "R04"), ("raw", "M66")],  # change to array
+    "Disgust": [("raw", "L01"), ("raw", "R01"), ("raw", "M66")],  # change to array
+    "Anger": [("LIGHTS", "ang")],
+    "Contempt": [("raw", "L01"), ("raw", "R09"), ("raw", "ME9")],  # change to array
+    "Cunning": [("LIGHTS", "cun")],
+    "Shy": [("LIGHTS", "shy")],
+    "Evil": [("LIGHTS", "evi")]
 }
 
 
@@ -194,7 +197,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             else:
                 self.activate_communication(self.acquire_head_eye_coordinates, "listen")
         if gaze_plane_coordinates_port:
-            self.activate_communication(self.gaze_plane_coordinates_port, "listen")
+            self.activate_communication(self.control_gaze_at_plane, "listen")
 
         self.build()
 
@@ -207,7 +210,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         ICub.control_gaze.__defaults__ = ((0, 0, 0), (0, 0, 0), self.MWARE)
         ICub.control_gaze_at_plane.__defaults__ = ((0, 0,), (0.3, 0.3), True, True, self.MWARE)
         ICub.acquire_facial_expressions.__defaults__ = (self.FACIAL_EXPRESSIONS_PORT, None, self.MWARE)
-        ICub.update_facial_expressions.__defaults__ = ("LIGHTS", None, self.MWARE)
+        ICub.update_facial_expressions.__defaults__ = (False, None, self.MWARE)
         ICub.receive_images.__defaults__ = (self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT, True)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
@@ -428,30 +431,36 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 exit(0)
             elif cv2_key == -1:  # normally -1 returned,so don"t print it
                 pass
-            elif cv2_key == 49:  # 1 key: sad emotion
-                emotion = "sad"
-                logging.info("expressing sadness")
-            elif cv2_key == 50:  # 2 key: angry emotion
-                emotion = "ang"
-                logging.info("expressing anger")
-            elif cv2_key == 51:  # 3 key: happy emotion
-                emotion = "hap"
-                logging.info("expressing happiness")
-            elif cv2_key == 52:  # 4 key: neutral emotion
-                emotion = "neu"
+            elif cv2_key == 48:  # 0 key: Neutral emotion
+                emotion = "Neutral"
                 logging.info("expressing neutrality")
-            elif cv2_key == 53:  # 5 key: surprise emotion
-                emotion = "sur"
+            elif cv2_key == 49:  # 1 key: Happy emotion
+                emotion = "Happy"
+                logging.info("expressing happiness")
+            elif cv2_key == 50:  # 2 key: Sad emotion
+                emotion = "Sad"
+                logging.info("expressing sadness")
+            elif cv2_key == 51:  # 3 key: Surprise emotion
+                emotion = "Surprise"
                 logging.info("expressing surprise")
-            elif cv2_key == 54:  # 6 key: shy emotion
-                emotion = "shy"
-                logging.info("expressing shyness")
-            elif cv2_key == 55:  # 7 key: evil emotion
-                emotion = "evi"
-                logging.info("expressing evilness")
-            elif cv2_key == 56:  # 8 key: cunning emotion
-                emotion = "cun"
+            elif cv2_key == 52:  # 4 key: Fear emotion
+                emotion = "Fear"
+                logging.info("expressing fear")
+            elif cv2_key == 53:  # 5 key: Disgust emotion
+                emotion = "Disgust"
+                logging.info("expressing disgust")
+            elif cv2_key == 54:  # 6 key: Anger emotion
+                emotion = "Anger"
+                logging.info("expressing anger")
+            elif cv2_key == 55:  # 7 key: Contempt emotion
+                emotion = "Contempt"
+                logging.info("expressing contempt")
+            elif cv2_key == 56:  # 8 key: Cunning emotion
+                emotion = "Cunning"
                 logging.info("expressing cunningness")
+            elif cv2_key == 57:  # 9 key: Shy emotion
+                emotion = "Shy"
+                logging.info("expressing shyness")
             else:
                 logging.info(cv2_key)  # else print its value
                 return None,
@@ -462,7 +471,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/facial_expressions",
                                      should_wait=False)
-    def update_facial_expressions(self, expression, part="LIGHTS", smoothing="mode", _mware=MWARE):
+    def update_facial_expressions(self, expression, part=False, smoothing="mode", _mware=MWARE):
         """
         Control facial expressions of the iCub
         :param expression: Expression abbreviation
@@ -472,9 +481,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         """
         if expression is None:
             return None,
+
         if isinstance(expression, (list, tuple)):
             expression = expression[-1]
-        expression = EMOTION_LOOKUP.get(expression, expression)
 
         if smoothing == "mode":
             self.expressions_queue.append(expression)
@@ -483,18 +492,24 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         else:
             transmitted_expression = expression
 
-        if self.last_expression[0] == part and self.last_expression[1] == transmitted_expression:
-            pass
-        elif part == "LIGHTS":
-            self.client.sendline(f"set leb {expression}")
-            self.client.expect(">>")
-            self.client.sendline(f"set reb {expression}")
-            self.client.expect(">>")
-            self.client.sendline(f"set mou {expression}")
-            self.client.expect(">>")
-        else:
-            self.client.sendline(f"set {part} {expression}")
-            self.client.expect(">>")
+        expressions_lookup = EMOTION_LOOKUP.get(transmitted_expression, transmitted_expression)
+        if isinstance(expressions_lookup, str):
+            expressions_lookup = [(part if part else "all", expressions_lookup)]
+
+        if self.last_expression[0] == (part if part else "all") and self.last_expression[1] == transmitted_expression:
+            expressions_lookup = []
+
+        for (part_lookup, expression_lookup) in expressions_lookup:
+            if part_lookup == "LIGHTS":
+                self.client.sendline(f"set leb {expression_lookup}")
+                self.client.expect(">>")
+                self.client.sendline(f"set reb {expression_lookup}")
+                self.client.expect(">>")
+                self.client.sendline(f"set mou {expression_lookup}")
+                self.client.expect(">>")
+            else:
+                self.client.sendline(f"set {part_lookup} {expression_lookup}")
+                self.client.expect(">>")
 
         self.last_expression[0] = part
         self.last_expression[1] = transmitted_expression
@@ -538,7 +553,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                                           cv2_key=k, _mware=self.MWARE)
         if switch_emotion is not None and isinstance(switch_emotion, dict):
             self.update_facial_expressions(switch_emotion.get("emotion_category", None),
-                                           part=switch_emotion.get("part", "LIGHTS"), _mware=self.MWARE)
+                                           part=switch_emotion.get("part", False), _mware=self.MWARE)
 
         move_robot, = self.acquire_head_eye_coordinates(head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
                                                         cv2_key=k, _mware=self.MWARE)
