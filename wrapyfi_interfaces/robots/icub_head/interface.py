@@ -35,7 +35,7 @@ Here we demonstrate
 
 
 Run:
-    # For the list of keyboard controls, go to the comment [# the keyboard commands for controlling the robot]
+    # For the list of keyboard controls, refer to the comments in acquire_... prefixed methods [# the keyboard commands for controlling the robot]
     
     # Alternative 1 (simulation)
     # Ensure that the `iCub_SIM` is running in a standalone terminal
@@ -202,6 +202,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self.build()
 
     def build(self):
+        """
+        Updates the default method arguments according to constructor arguments. This method is called by the module constructor.
+        It is not necessary to call it manually.
+        """
         ICub.acquire_head_eye_coordinates.__defaults__ = (self.HEAD_EYE_COORDINATES_PORT, None, self.MWARE)
         ICub.receive_gaze_plane_coordinates.__defaults__ = (self.GAZE_PLANE_COORDINATES_PORT, self.MWARE)
         ICub.wait_for_gaze.__defaults__ = (True, self.MWARE)
@@ -213,11 +217,20 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         ICub.update_facial_expressions.__defaults__ = (False, None, self.MWARE)
         ICub.receive_images.__defaults__ = (self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT, True)
 
+
+
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$head_eye_coordinates_port",
                                      should_wait=False)
     def acquire_head_eye_coordinates(self, head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT, cv2_key=None,
                                      _mware=MWARE):
+        """
+        Acquire head and eye coordinates for controlling the iCub.
+        :param head_eye_coordinates_port: str: Port to receive head and eye coordinates
+        :param cv2_key: int: Key pressed by the user
+        :return: dict: Head and eye coordinates
+        """
+
         if cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
             logging.error("controlling orientation in headless mode not yet supported")
@@ -275,12 +288,23 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      "ICub", "$gaze_plane_coordinates_port",
                                      should_wait=False)
     def receive_gaze_plane_coordinates(self, gaze_plane_coordinates_port=GAZE_PLANE_COORDINATES_PORT, _mware=MWARE):
+        """
+        Receive gaze plane (normalized x,y) coordinates for controlling the iCub.
+        :param gaze_plane_coordinates_port: str: Port to receive gaze plane coordinates
+        :return: dict: Gaze plane coordinates
+        """
         return None,
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/wait_for_gaze",
                                      should_wait=False)
     def wait_for_gaze(self, reset=True, _mware=MWARE):
+        """
+        Wait for the gaze actuation to complete.
+        :param reset: bool: Whether to reset the gaze location (centre)
+        :param _mware: str: Middleware to use
+        :return: dict: Gaze waiting log for a given time step
+        """
         if self.ikingaze:
             # self._igaze.clearNeckPitch()
             # self._igaze.clearNeckRoll()
@@ -303,8 +327,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      should_wait=False)
     def reset_gaze(self, _mware=MWARE):
         """
-        Reset the eyes to their original position
-        :return: None
+        Reset the eyes to their original position.
+        :param _mware: str: Middleware to use
+        :return: dict: Gaze reset log for a given time step
         """
         self.wait_for_gaze(reset=True)
         return {"topic": "logging_reset_gaze",
@@ -316,10 +341,13 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      should_wait=False)
     def update_gaze_speed(self, head_speed=(10.0, 10.0, 20.0), eyes_speed=(20.0, 20.0, 20.0), _mware=MWARE):
         """
-        Control the iCub head and eye speeds
-        :param head_speed: Head speed (tilt, swing, pan) in deg/sec or int for neck speed (norm) when using iKinGaze
-        :param eyes_speed: Eye speed (tilt, pan, divergence) in deg/sec or int for eyes speed (norm) when using iKinGaze
-        :return: None
+        Control the iCub head and eye speeds.
+        :param head_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->roll[deg/s]) or float->speed[0,1]:
+                            Head orientation speed or float for neck speed (norm) when using iKinGaze
+        :param eyes_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->vergence[deg/sec]) or float->speed[0,1]:
+                            Eyes orientation speed or float for eyes speed (norm) when using iKinGaze
+        :param _mware: str: Middleware to use
+        :return: dict: Orientation speed log for a given time step
         """
         if self.ikingaze:
             if isinstance(head_speed, tuple):
@@ -347,10 +375,11 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      should_wait=False)
     def control_gaze(self, head=(0, 0, 0), eyes=(0, 0, 0), _mware=MWARE):
         """
-        Control the iCub head or eyes
-        :param head: Head coordinates (tilt, swing, pan) in degrees
-        :param eyes: Eye coordinates (tilt, pan, divergence) in degrees
-        :return: None
+        Control the iCub head or eyes.
+        :param head: tuple(float->pitch[deg], float->yaw[deg], float->roll[deg]): Head orientation coordinates
+        :param eyes: tuple(float->pitch[deg], float->yaw[deg], float->vergence[0,1]): Eyes orientation coordinates
+        :param _mware: str: Middleware to use
+        :return: dict: Orientation coordinates log for a given time step
         """
         # wait for the action to complete
         # self.wait_for_gaze(reset=False)
@@ -381,13 +410,12 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def control_gaze_at_plane(self, xy=(0, 0,), limiting_consts_xy=(0.3, 0.3), control_eyes=True, control_head=True,
                               _mware=MWARE):
         """
-        Gaze at specific point in a normalized plane in front of the robot
-
-        :param xy: tuple representing the x and y position limited to the range of -1 (bottom left) and 1 (top right)
-        :param limiting_consts_xy: tuple representing the x and y position limiting constants
-        :param control_eyes: bool indicating whether to control the eyes
-        :param control_head: bool indicating whether to control the head
-        :return: None
+        Gaze at specific point in a normalized plane in front of the iCub.
+        :param xy: tuple(float->x[-1,1],float->y[-1,1]): Position limited to the range of -1 (bottom left) and 1 (top right)
+        :param limiting_consts_xy: tuple(float->x[0,1],float->y[0,1]): Limiting constants for the x and y coordinates
+        :param control_eyes: bool: Whether to control the eyes of the robot directly
+        :param control_head: bool: Whether to control the head of the robot directly
+        :return: dict: Gaze coordinates log for a given time step
         """
         # wait for the action to complete
         # self.wait_for_gaze(reset=False)
@@ -421,6 +449,12 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      should_wait=False)
     def acquire_facial_expressions(self, facial_expressions_port=FACIAL_EXPRESSIONS_PORT, cv2_key=None,
                                    _mware=MWARE):
+        """
+        Acquire facial expressions from the iCub.
+        :param facial_expressions_port: str: Port to acquire facial expressions from
+        :param cv2_key: int: Key to press to set the facial expression
+        :return: dict: Facial expressions log for a given time step
+        """
         emotion = None
         if cv2_key is None:
             # TODO (fabawi): listen to stdin for keypress
@@ -473,11 +507,14 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      should_wait=False)
     def update_facial_expressions(self, expression, part=False, smoothing="mode", _mware=MWARE):
         """
-        Control facial expressions of the iCub
-        :param expression: Expression abbreviation
-        :param part: Abbreviation describing parts to control (refer to iCub documentation) ( mou, eli, leb, reb, all, LIGHTS)
-        :param smoothing: Name of smoothing filter to avoid abrupt changes in emotional expressions
-        :return: None
+        Control facial expressions of the iCub.
+        :param expression: str: Expression to be controlled
+        :param expression: str or tuple(str->part, str->emotion) or list[str] or list[tuple(str->part, str->emotion)]:
+                            Expression/s abbreviation or matching lookup table entry.
+                            If a list is provided, the actions are executed in sequence
+        :param part: str: Abbreviation describing parts to control (refer to iCub documentation) ( mou, eli, leb, reb, all, raw, LIGHTS)
+        :param smoothing: str: Name of smoothing filter to avoid abrupt changes in emotional expressions
+        :return: Emotion log for a given time step
         """
         if expression is None:
             return None,
@@ -526,10 +563,24 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      width="$img_width", height="$img_height", rgb="$_rgb")
     def receive_images(self, cam_world_port, cam_left_port, cam_right_port,
                        img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, _rgb=True):
+        """
+        Receive images from the iCub.
+        :param cam_world_port: str: Port to receive images from the world camera
+        :param cam_left_port: str: Port to receive images from the left camera
+        :param cam_right_port: str: Port to receive images from the right camera
+        :param img_width: int: Width of the image
+        :param img_height: int: Height of the image
+        :param _rgb: bool: Whether the image is RGB or not
+        :return: Images from the iCub
+        """
         external_cam, left_cam, right_cam = None, None, None
         return external_cam, left_cam, right_cam
 
     def getPeriod(self):
+        """
+        Get the period of the module.
+        :return: float: Period of the module
+        """
         return 0.01
 
     def updateModule(self):

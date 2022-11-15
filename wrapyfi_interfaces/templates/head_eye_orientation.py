@@ -1,4 +1,3 @@
-import os
 import time
 import argparse
 
@@ -33,8 +32,13 @@ class OrientationInterface(MiddlewareCommunicator):
             self.PORT_IN = head_eyes_orientation_port_in
             self.MWARE_IN = mware_in
             self.activate_communication("receive_orientation", "listen")
+        self.build()
 
     def build(self):
+        """
+        Updates the default method arguments according to constructor arguments. This method is called by the module constructor.
+        It is not necessary to call it manually.
+        """
         OrientationInterface.transmit_orientation.__defaults__ = (self.PORT_OUT, self.SHOULD_WAIT, self.MWARE_OUT)
         OrientationInterface.receive_orientation.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
@@ -42,6 +46,18 @@ class OrientationInterface(MiddlewareCommunicator):
                                      "$head_eyes_orientation_port", should_wait="$_should_wait")
     def transmit_orientation(self, head, eyes, head_speed, eyes_speed, reset_gaze,
                          head_eyes_orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
+        """
+        Publishes the orientation coordinates to the middleware.
+        :param head: tuple(float->pitch[deg], float->yaw[deg], float->roll[deg]): Head orientation coordinates
+        :param eyes: tuple(float->pitch[deg], float->yaw[deg], float->vergence[0,1]): Eyes orientation coordinates
+        :param head_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->roll[deg/s]): Head orientation speed
+        :param eyes_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->vergence[deg/sec]):Eyes orientation speed
+        :param reset_gaze: bool: Reset the gaze to the default position
+        :param head_eyes_orientation_port: str: Port to publish the orientation coordinates to
+        :param _should_wait: bool: Whether to wait for a response
+        :param _mware: str: Middleware to use
+        :return: dict: Orientation coordinates for a given time step
+        """
         return {"topic": head_eyes_orientation_port.split("/")[-1],
                 "head": head,
                 "eyes": eyes,
@@ -54,9 +70,20 @@ class OrientationInterface(MiddlewareCommunicator):
                                         "$head_eyes_orientation_port", should_wait="$_should_wait")
     def receive_orientation(self, head_eyes_orientation_port=PORT_IN, _should_wait=SHOULD_WAIT, _mware=MWARE_IN,
                             **kwargs):
+        """
+        Receives the orientation coordinates from the middleware of choice.
+        :param head_eyes_orientation_port: str: Port to receive the orientation coordinates from
+        :param _should_wait: bool: Whether to wait for a response
+        :param _mware: str: Middleware to use
+        :return: dict: Orientation coordinates for a given time step
+        """
         return None,
 
     def getPeriod(self):
+        """
+        Get the period of the module.
+        :return: float: Period of the module
+        """
         return 0.01
 
     def updateModule(self):
