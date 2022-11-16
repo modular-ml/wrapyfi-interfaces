@@ -16,20 +16,20 @@ class OrientationInterface(MiddlewareCommunicator):
     This template acts as a bridge between different middleware and/or ports (topics).
     """
     def __init__(self,
-                 head_eyes_orientation_port_out=PORT_OUT,
+                 orientation_port_out=PORT_OUT,
                  mware_out=MWARE_OUT,
-                 head_eyes_orientation_port_in=PORT_IN,
+                 orientation_port_in=PORT_IN,
                  mware_in=MWARE_IN, should_wait=SHOULD_WAIT):
         super(OrientationInterface, self).__init__()
 
         self.SHOULD_WAIT = should_wait
-        if head_eyes_orientation_port_out and mware_out:
-            self.PORT_OUT = head_eyes_orientation_port_out
+        if orientation_port_out and mware_out:
+            self.PORT_OUT = orientation_port_out
             self.MWARE_OUT = mware_out
             self.activate_communication("transmit_orientation", "publish")
 
-        if head_eyes_orientation_port_in and mware_in:
-            self.PORT_IN = head_eyes_orientation_port_in
+        if orientation_port_in and mware_in:
+            self.PORT_IN = orientation_port_in
             self.MWARE_IN = mware_in
             self.activate_communication("receive_orientation", "listen")
         self.build()
@@ -39,11 +39,11 @@ class OrientationInterface(MiddlewareCommunicator):
         Updates the default method arguments according to constructor arguments. This method is called by the module constructor.
         It is not necessary to call it manually.
         """
-        OrientationInterface.transmit_orientation.__defaults__ = (self.PORT_OUT, self.SHOULD_WAIT, self.MWARE_OUT)
+        OrientationInterface.transmit_orientation.__defaults__ = (None, None, None, None, self.PORT_OUT, self.SHOULD_WAIT, self.MWARE_OUT)
         OrientationInterface.receive_orientation.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
-                                     "$head_eyes_orientation_port", should_wait="$_should_wait")
+                                     "$orientation_port", should_wait="$_should_wait")
     def transmit_orientation(self, pitch=None, roll=None, yaw=None, speed=None,
                              orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
@@ -74,7 +74,7 @@ class OrientationInterface(MiddlewareCommunicator):
                 "timestamp": kwargs.get("timestamp", time.time())},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
-                                        "$head_eyes_orientation_port", should_wait="$_should_wait")
+                                        "$orientation_port", should_wait="$_should_wait")
     def receive_orientation(self, orientation_port=PORT_IN, _should_wait=SHOULD_WAIT, _mware=MWARE_IN,
                             **kwargs):
         """
@@ -94,14 +94,14 @@ class OrientationInterface(MiddlewareCommunicator):
         return 0.01
 
     def updateModule(self):
-        orientation_in, = self.receive_orientation(head_eyes_orientation_port=self.PORT_IN,
-                                               _should_wait=self.SHOULD_WAIT,
-                                               _mware=self.MWARE_IN)
+        orientation_in, = self.receive_orientation(orientation_port=self.PORT_IN,
+                                                   _should_wait=self.SHOULD_WAIT,
+                                                   _mware=self.MWARE_IN)
         if orientation_in is not None:
             print(f"Received emotion: {orientation_in}")
             time.sleep(self.getPeriod())
             orientation_out = self.transmit_orientation(**orientation_in,
-                                                        head_eyes_orientation_port=self.PORT_OUT,
+                                                        orientation_port=self.PORT_OUT,
                                                         _should_wait=self.SHOULD_WAIT,
                                                         _mware=self.MWARE_OUT)
             if orientation_out is not None:

@@ -242,7 +242,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      "ICub", "$head_coordinates_port",
                                      should_wait=False)
     def acquire_head_coordinates(self, head_coordinates_port=HEAD_COORDINATES_PORT, cv2_key=None,
-                                     _mware=MWARE):
+                                     _mware=MWARE, **kwargs):
         """
         Acquire head coordinates for controlling the iCub.
         :param head_coordinates_port: str: Port to receive head coordinates
@@ -295,7 +295,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      "ICub", "$eye_coordinates_port",
                                      should_wait=False)
     def acquire_eye_coordinates(self, eye_coordinates_port=EYE_COORDINATES_PORT, cv2_key=None,
-                                     _mware=MWARE):
+                                     _mware=MWARE, **kwargs):
         """
         Acquire eye coordinates for controlling the iCub.
         :param eye_coordinates_port: str: Port to receive eye coordinates
@@ -341,7 +341,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$gaze_plane_coordinates_port",
                                      should_wait=False)
-    def receive_gaze_plane_coordinates(self, gaze_plane_coordinates_port=GAZE_PLANE_COORDINATES_PORT, _mware=MWARE):
+    def receive_gaze_plane_coordinates(self, gaze_plane_coordinates_port=GAZE_PLANE_COORDINATES_PORT,
+                                       _mware=MWARE, **kwargs):
         """
         Receive gaze plane (normalized x,y) coordinates for controlling the iCub.
         :param gaze_plane_coordinates_port: str: Port to receive gaze plane coordinates
@@ -421,7 +422,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", "$mware",
                                      "ICub", "/icub_controller/logs/eye_speed",
                                      should_wait=False)
-    def update_eye_gaze_speed(self, pitch=10.0, yaw=10.0, vergence=20.0, eye=0.5, _mware=MWARE):
+    def update_eye_gaze_speed(self, pitch=10.0, yaw=10.0, vergence=20.0, eye=0.5, _mware=MWARE, **kwargs):
         """
         Control the iCub eye speed.
         :param pitch: float->pitch[deg/s]: Pitch speed
@@ -510,7 +511,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      "ICub", "/icub_controller/logs/gaze_plane_coordinates",
                                      should_wait=False)
     def control_gaze_at_plane(self, x=0.0, y=0.0, limit_x=0.3, limit_y=0.3, control_eyes=True, control_head=True,
-                              _mware=MWARE):
+                              _mware=MWARE, **kwargs):
         """
         Gaze at specific point in a normalized plane in front of the iCub.
         :param x: float->x[-1,1]: x coordinate in the plane limited to the range of -1 (left) and 1 (right)
@@ -558,7 +559,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      "ICub", "$facial_expressions_port",
                                      should_wait=False)
     def acquire_facial_expressions(self, facial_expressions_port=FACIAL_EXPRESSIONS_PORT, cv2_key=None,
-                                   _mware=MWARE):
+                                   _mware=MWARE, **kwargs):
         """
         Acquire facial expressions from the iCub.
         :param facial_expressions_port: str: Port to acquire facial expressions from
@@ -615,7 +616,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/facial_expressions",
                                      should_wait=False)
-    def update_facial_expressions(self, expression, part=False, smoothing="mode", _mware=MWARE):
+    def update_facial_expressions(self, expression, part=False, smoothing="mode", _mware=MWARE, **kwargs):
         """
         Control facial expressions of the iCub.
         :param expression: str: Expression to be controlled
