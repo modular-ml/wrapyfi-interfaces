@@ -5,9 +5,9 @@ from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
 
 class OrientationInterface(MiddlewareCommunicator):
-    PORT_OUT = "/control_interface/head_eyes_orientation_out"
+    PORT_OUT = "/control_interface/orientation_out"
     MWARE_OUT = DEFAULT_COMMUNICATOR
-    PORT_IN = "/control_interface/head_eyes_orientation_in"
+    PORT_IN = "/control_interface/orientation_in"
     MWARE_IN = DEFAULT_COMMUNICATOR
     SHOULD_WAIT = False
 
@@ -44,35 +44,42 @@ class OrientationInterface(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
                                      "$head_eyes_orientation_port", should_wait="$_should_wait")
-    def transmit_orientation(self, head, eyes, head_speed, eyes_speed, reset_gaze,
-                         head_eyes_orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
+    def transmit_orientation(self, pitch=None, roll=None, yaw=None, speed=None,
+                             orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
         Publishes the orientation coordinates to the middleware.
-        :param head: tuple(float->pitch[deg], float->yaw[deg], float->roll[deg]): Head orientation coordinates
-        :param eyes: tuple(float->pitch[deg], float->yaw[deg], float->vergence[0,1]): Eyes orientation coordinates
-        :param head_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->roll[deg/s]): Head orientation speed
-        :param eyes_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->vergence[deg/sec]):Eyes orientation speed
-        :param reset_gaze: bool: Reset the gaze to the default position
-        :param head_eyes_orientation_port: str: Port to publish the orientation coordinates to
+        :param pitch: float->pitch[deg]: Pitch angle in degrees
+        :param roll: float->roll[deg]: Roll angle in degrees
+        :param yaw: float->yaw[deg]: Yaw angle in degrees
+        :param speed: dict{float->pitch[deg/s], float->roll[deg/s], float->yaw[deg/s], **kwargs}: Speed of trajectory
+        :orientation_port: str: Port to publish the orientation coordinates to
         :param _should_wait: bool: Whether to wait for a response
         :param _mware: str: Middleware to use
+        :kwargs: dict: Additional parameters specific to an application e.g. vergence[deg].
+                        Applies to speed as well e.g. vergence[deg/s]
         :return: dict: Orientation coordinates for a given time step
         """
-        return {"topic": head_eyes_orientation_port.split("/")[-1],
-                "head": head,
-                "eyes": eyes,
-                "head_speed": head_speed,
-                "eyes_speed": eyes_speed,
-                "reset_gaze": reset_gaze,
-                "timestamp": time.time()},
+        returns = kwargs
+        if pitch is not None:
+            returns["pitch"] = pitch
+        if roll is not None:
+            returns["roll"] = roll
+        if yaw is not None:
+            returns["yaw"] = yaw
+        if speed is not None:
+            returns["speed"] = speed
+
+        return {"topic": orientation_port.split("/")[-1],
+                **returns,
+                "timestamp": kwargs.get("timestamp", time.time())},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
                                         "$head_eyes_orientation_port", should_wait="$_should_wait")
-    def receive_orientation(self, head_eyes_orientation_port=PORT_IN, _should_wait=SHOULD_WAIT, _mware=MWARE_IN,
+    def receive_orientation(self, orientation_port=PORT_IN, _should_wait=SHOULD_WAIT, _mware=MWARE_IN,
                             **kwargs):
         """
         Receives the orientation coordinates from the middleware of choice.
-        :param head_eyes_orientation_port: str: Port to receive the orientation coordinates from
+        :param orientation_port: str: Port to receive the orientation coordinates from
         :param _should_wait: bool: Whether to wait for a response
         :param _mware: str: Middleware to use
         :return: dict: Orientation coordinates for a given time step
@@ -93,11 +100,7 @@ class OrientationInterface(MiddlewareCommunicator):
         if orientation_in is not None:
             print(f"Received emotion: {orientation_in}")
             time.sleep(self.getPeriod())
-            orientation_out = self.transmit_orientation(head=orientation_in["head"],
-                                                        eyes=orientation_in["eyes"],
-                                                        head_speed=orientation_in["head_speed"],
-                                                        eyes_speed=orientation_in["eyes_speed"],
-                                                        reset_gaze=orientation_in["reset_gaze"],
+            orientation_out = self.transmit_orientation(**orientation_in,
                                                         head_eyes_orientation_port=self.PORT_OUT,
                                                         _should_wait=self.SHOULD_WAIT,
                                                         _mware=self.MWARE_OUT)
@@ -114,15 +117,15 @@ class OrientationInterface(MiddlewareCommunicator):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--head_eye_port_out", type=str, default="",
+    parser.add_argument("--orientation_port_out", type=str, default="",
                         help="Port (topic) to publish orientation coordinates")
     parser.add_argument("--mware_out", type=str, default=DEFAULT_COMMUNICATOR,
-                        help="Middleware to publish head or eye orientation coordinates",
+                        help="Middleware to publish orientation coordinates",
                         choices=MiddlewareCommunicator.get_communicators())
-    parser.add_argument("--head_eye_port_in", type=str, default="",
+    parser.add_argument("--orientation_port_in", type=str, default="",
                         help="Port (topic) to listen to orientation coordinates")
     parser.add_argument("--mware_in", type=str, default=DEFAULT_COMMUNICATOR,
-                        help="Middleware to listen to head or eye orientation coordinates",
+                        help="Middleware to listen to orientation coordinates",
                         choices=MiddlewareCommunicator.get_communicators())
     parser.add_argument("--should_wait", action="store_true", help="Wait for at least one listener before publishing "
                                                                    "or a publisher before listening")

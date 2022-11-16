@@ -46,23 +46,30 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
                                      "$_facial_expressions_port", should_wait="$_should_wait")
-    def transmit_emotion(self, emotion_category, emotion_continuous, emotion_index,
-                         facial_expressions_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT):
+    def transmit_emotion(self, emotion_category=None, emotion_continuous=None, emotion_index=None,
+                         facial_expressions_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
         Send emotion data to middleware of choice.
-        :param emotion_category: list[str] or str: Emotion category (e.g. Happy, Sad, Angry, ...). Final emotion is the last element when a list is provided.
+        :param emotion_category: list[str] or str: Emotion category (e.g. Happy, Sad, Angry, ...). Final/winning emotion is the last element when a list is provided.
         :param emotion_continuous: list[tuple(str->valence, str->arousal)] or tuple(str->valence, str->arousal): Continuous emotion in the range [0, 1] representing valence and arousal
-        :param emotion_index: list[int] or int: Emotion index indicating the final emotion from the emotion categories when list provided
+        :param emotion_index: list[int] or int: Emotion index indicating category (e.g. 0 for Happy, 1 for Sad, 2 for Angry, ...). Final/winning emotion is the last element when a list is provided.
         :param facial_expressions_port: str:  Port to send emotion data to
         :param _should_wait: bool: Whether to wait for a response
         :param _mware: str: Middleware to use
+        :kwargs: dict: Additional parameters specific to an application e.g. int->participant_index
         :return: dict: Emotion data for a given time step
         """
+        returns = kwargs
+        if emotion_category is not None:
+            returns["emotion_category"] = emotion_category
+        if emotion_continuous is not None:
+            returns["emotion_continuous"] = emotion_continuous
+        if emotion_index is not None:
+            returns["emotion_index"] = emotion_index
+
         return {"topic": facial_expressions_port.split("/")[-1],
-                "emotion_category": emotion_category,
-                "emotion_continuous": emotion_continuous,
-                "emotion_index": emotion_index,
-                "timestamp": time.time()},
+                **returns,
+                "timestamp": kwargs.get("timestamp", time.time())},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
                                         "$facial_expressions_port", should_wait="$_should_wait")
@@ -90,9 +97,7 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
         if emotion_in is not None:
             print(f"Received emotion: {emotion_in}")
             time.sleep(self.getPeriod())
-            emotion_out = self.transmit_emotion(emotion_category=emotion_in["emotion_category"],
-                                                emotion_continuous=emotion_in["emotion_continuous"],
-                                                emotion_index=emotion_in["emotion_index"],
+            emotion_out = self.transmit_emotion(**emotion_in,
                                                 facial_expressions_port=self.PORT_OUT,
                                                 _should_wait=self.SHOULD_WAIT,
                                                 _mware=self.MWARE_OUT)

@@ -67,7 +67,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     MWARE = ICUB_DEFAULT_COMMUNICATOR
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
-    HEAD_EYE_COORDINATES_PORT = "/control_interface/head_eye_coordinates"
+    HEAD_COORDINATES_PORT = "/control_interface/head_coordinates"
+    EYE_COORDINATES_PORT = "/control_interface/eye_coordinates"
     GAZE_PLANE_COORDINATES_PORT = "/control_interface/gaze_plane_coordinates"
     FACIAL_EXPRESSIONS_PORT = "/control_interface/facial_expressions"
     # constants
@@ -76,8 +77,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
     def __init__(self, simulation=False, headless=False, get_cam_feed=True,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
-                 control_head=True,
-                 set_head_eye_coordinates=True, head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT,
+                 control_head=True, set_head_coordinates=True, head_coordinates_port=HEAD_COORDINATES_PORT,
+                 control_eyes=True, set_eye_coordinates=True, eye_coordinates_port=EYE_COORDINATES_PORT,
                  ikingaze=False,
                  gaze_plane_coordinates_port=GAZE_PLANE_COORDINATES_PORT,
                  control_expressions=False,
@@ -90,7 +91,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self.MWARE = mware
         self.FACIAL_EXPRESSIONS_PORT = facial_expressions_port
         self.GAZE_PLANE_COORDINATES_PORT = gaze_plane_coordinates_port
-        self.HEAD_EYE_COORDINATES_PORT = head_eye_coordinates_port
+        self.HEAD_COORDINATES_PORT = head_coordinates_port
+        self.EYE_COORDINATES_PORT = eye_coordinates_port
 
         self.headless = headless
         self.ikingaze = ikingaze
@@ -139,7 +141,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self._curr_eyes = [0, 0, 0]
         self._curr_head = [0, 0, 0]
         
-        if control_head:
+        if control_head or control_eyes:
             if ikingaze:
                 self._gaze_encs = yarp.Vector(3, 0.0)
                 props_gaze = yarp.Property()
@@ -154,8 +156,10 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self._igaze.setStabilizationMode(True)
 
                 # set movement speed
-                # self.update_speed_gaze(head_speed=0.8, eyes_speed=0.5)
-                
+                # self.update_head_gaze_speed(head=0.8)
+                # self.update_eye_gaze_speed(eye=0.5)
+                self.activate_communication(self.control_head_gaze, "disable")
+                self.activate_communication(self.control_eye_gaze, "disable")
             else:
                 # create remote driver
                 self._head_driver = yarp.PolyDriver(props)
@@ -173,13 +177,23 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self._encs = yarp.Vector(self._num_jnts)
                 self._ienc.getEncoders(self._encs.data())
 
+                if not control_head:
+                    self.activate_communication(self.control_head_gaze, "disable")
+                    self.activate_communication(self.update_head_gaze_speed, "disable")
+                if not control_eyes:
+                    self.activate_communication(self.control_eye_gaze, "disable")
+                    self.activate_communication(self.update_eye_gaze_speed, "disable")
+
                 # set movement speed
-                # self.update_speed_gaze(head_speed=(10.0, 10.0, 20.0), eyes_speed=(10.0, 10.0, 20.0))
+                # self.update_head_gaze_speed(pitch=10.0, roll=10.0, yaw=20.0)
+                # self.update_eye_gaze_speed(pitch=10.0, yaw=10.0, vergence=20.0)
 
         else:
             self.activate_communication(self.reset_gaze, "disable")
-            self.activate_communication(self.update_gaze_speed, "disable")
-            self.activate_communication(self.control_gaze, "disable")
+            self.activate_communication(self.update_head_gaze_speed, "disable")
+            self.activate_communication(self.control_head_gaze, "disable")
+            self.activate_communication(self.update_eye_gaze_speed, "disable")
+            self.activate_communication(self.control_eye_gaze, "disable")
             self.activate_communication(self.wait_for_gaze, "disable")
             self.activate_communication(self.control_gaze_at_plane, "disable")
             
@@ -191,11 +205,16 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self.activate_communication(self.acquire_facial_expressions, "publish")
             else:
                 self.activate_communication(self.acquire_facial_expressions, "listen")
-        if head_eye_coordinates_port:
-            if set_head_eye_coordinates:
-                self.activate_communication(self.acquire_head_eye_coordinates, "publish")
+        if head_coordinates_port:
+            if set_head_coordinates:
+                self.activate_communication(self.acquire_head_coordinates, "publish")
             else:
-                self.activate_communication(self.acquire_head_eye_coordinates, "listen")
+                self.activate_communication(self.acquire_head_coordinates, "listen")
+        if eye_coordinates_port:
+            if set_eye_coordinates:
+                self.activate_communication(self.acquire_eye_coordinates, "publish")
+            else:
+                self.activate_communication(self.acquire_eye_coordinates, "listen")
         if gaze_plane_coordinates_port:
             self.activate_communication(self.control_gaze_at_plane, "listen")
 
@@ -210,25 +229,25 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         ICub.receive_gaze_plane_coordinates.__defaults__ = (self.GAZE_PLANE_COORDINATES_PORT, self.MWARE)
         ICub.wait_for_gaze.__defaults__ = (True, self.MWARE)
         ICub.reset_gaze.__defaults__ = (self.MWARE,)
-        ICub.update_gaze_speed.__defaults__ = ((10.0, 10.0, 20.0), (20.0, 20.0, 20.0), self.MWARE)
-        ICub.control_gaze.__defaults__ = ((0, 0, 0), (0, 0, 0), self.MWARE)
-        ICub.control_gaze_at_plane.__defaults__ = ((0, 0,), (0.3, 0.3), True, True, self.MWARE)
+        ICub.update_head_gaze_speed.__defaults__ = (10.0, 10.0, 20.0, 0.8, self.MWARE)
+        ICub.control_head_gaze.__defaults__ = (0.0, 0.0, 0.0, self.MWARE)
+        ICub.update_eye_gaze_speed.__defaults__ = (10.0, 10.0, 20.0, 0.5, self.MWARE)
+        ICub.control_eye_gaze.__defaults__ = (0.0, 0.0, 0.0, self.MWARE)
+        ICub.control_gaze_at_plane.__defaults__ = (0, 0, 0.3, 0.3, True, True, self.MWARE)
         ICub.acquire_facial_expressions.__defaults__ = (self.FACIAL_EXPRESSIONS_PORT, None, self.MWARE)
         ICub.update_facial_expressions.__defaults__ = (False, None, self.MWARE)
         ICub.receive_images.__defaults__ = (self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT, True)
 
-
-
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
-                                     "ICub", "$head_eye_coordinates_port",
+                                     "ICub", "$head_coordinates_port",
                                      should_wait=False)
-    def acquire_head_eye_coordinates(self, head_eye_coordinates_port=HEAD_EYE_COORDINATES_PORT, cv2_key=None,
+    def acquire_head_coordinates(self, head_coordinates_port=HEAD_COORDINATES_PORT, cv2_key=None,
                                      _mware=MWARE):
         """
-        Acquire head and eye coordinates for controlling the iCub.
-        :param head_eye_coordinates_port: str: Port to receive head and eye coordinates
+        Acquire head coordinates for controlling the iCub.
+        :param head_coordinates_port: str: Port to receive head coordinates
         :param cv2_key: int: Key pressed by the user
-        :return: dict: Head and eye coordinates
+        :return: dict: Head orientation coordinates
         """
 
         if cv2_key is None:
@@ -259,6 +278,41 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             elif cv2_key == 100:  # D key
                 self._curr_head[1] += 1
                 logging.info("head roll left")
+            elif cv2_key == 114:  # R key: reset the orientation
+                self._curr_head = [0, 0, 0]
+                self.reset_gaze()
+                logging.info("resetting the orientation")
+            else:
+                logging.info(cv2_key)  # else print its value
+
+            return {"topic": head_coordinates_port.split("/")[-1],
+                    "timestamp": time.time(),
+                    "pitch": self._curr_head[0],
+                    "roll": self._curr_head[1],
+                    "yaw": self._curr_head[2]},
+
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
+                                     "ICub", "$eye_coordinates_port",
+                                     should_wait=False)
+    def acquire_eye_coordinates(self, eye_coordinates_port=EYE_COORDINATES_PORT, cv2_key=None,
+                                     _mware=MWARE):
+        """
+        Acquire eye coordinates for controlling the iCub.
+        :param eye_coordinates_port: str: Port to receive eye coordinates
+        :param cv2_key: int: Key pressed by the user
+        :return: dict: Eye oreintation coordinates
+        """
+
+        if cv2_key is None:
+            # TODO (fabawi): listen to stdin for keypress
+            logging.error("controlling orientation in headless mode not yet supported")
+            return None,
+        else:
+            if cv2_key == 27:  # Esc key to exit
+                exit(0)
+            elif cv2_key == -1:  # normally -1 returned,so don"t print it
+                pass
+            # the keyboard commands for controlling the robot
             elif cv2_key == 119:  # W key
                 self._curr_eyes[0] += 1
                 logging.info("eye pitch up")
@@ -273,16 +327,16 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 logging.info("eye yaw right")
             elif cv2_key == 114:  # R key: reset the orientation
                 self._curr_eyes = [0, 0, 0]
-                self._curr_head = [0, 0, 0]
                 self.reset_gaze()
                 logging.info("resetting the orientation")
             else:
                 logging.info(cv2_key)  # else print its value
 
-            return {"topic": head_eye_coordinates_port.split("/")[-1],
+            return {"topic": eye_coordinates_port.split("/")[-1],
                     "timestamp": time.time(),
-                    "head": self._curr_head,
-                    "eyes": self._curr_eyes},
+                    "pitch": self._curr_eyes[0],
+                    "yaw": self._curr_eyes[1],
+                    "vergence": self._curr_eyes[2]},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$gaze_plane_coordinates_port",
@@ -327,7 +381,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      should_wait=False)
     def reset_gaze(self, _mware=MWARE):
         """
-        Reset the eyes to their original position.
+        Reset the eyes and head to their original position.
         :param _mware: str: Middleware to use
         :return: dict: Gaze reset log for a given time step
         """
@@ -337,49 +391,72 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             "command": f"reset gaze"},
         
     @MiddlewareCommunicator.register("NativeObject", "$mware",
-                                     "ICub", "/icub_controller/logs/head_eye_speed",
+                                     "ICub", "/icub_controller/logs/head_speed",
                                      should_wait=False)
-    def update_gaze_speed(self, head_speed=(10.0, 10.0, 20.0), eyes_speed=(20.0, 20.0, 20.0), _mware=MWARE):
+    def update_head_gaze_speed(self, pitch=10.0, roll=10.0, yaw=20.0, head=0.8, _mware=MWARE, **kwargs):
         """
-        Control the iCub head and eye speeds.
-        :param head_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->roll[deg/s]) or float->speed[0,1]:
-                            Head orientation speed or float for neck speed (norm) when using iKinGaze
-        :param eyes_speed: tuple(float->pitch[deg/s], float->yaw[deg/s], float->vergence[deg/sec]) or float->speed[0,1]:
-                            Eyes orientation speed or float for eyes speed (norm) when using iKinGaze
+        Control the iCub head speed.
+        :param pitch: float->pitch[deg/s]: Pitch speed
+        :param roll: float->roll[deg/s]: Roll speed
+        :param yaw: float->yaw[deg/s]: Yaw speed
+        :param head: float->speed[0,1]: Neck trajectory speed in normalized units (only when using iKinGazeCtrl)
         :param _mware: str: Middleware to use
-        :return: dict: Orientation speed log for a given time step
+        :return: dict: Head orientation speed log for a given time step
         """
         if self.ikingaze:
-            if isinstance(head_speed, tuple):
-                head_speed = head_speed[0]
-                logging.warning("iKinGaze only supports one speed for the neck, using the first value")
-            if isinstance(eyes_speed, tuple):
-                eyes_speed = eyes_speed[0]
-                logging.warning("iKinGaze only supports one speed for the eyes, using the first value")
-            self._igaze.setNeckTrajTime(head_speed)
-            self._igaze.setEyesTrajTime(eyes_speed)
+            self._igaze.setNeckTrajTime(head)
+
+            return {"topic": "logging_head_speed",
+                    "timestamp": time.time(),
+                    "command": f"head speed set to {head}"},
         else:
-            self._ipos.setRefSpeed(0, head_speed[0])
-            self._ipos.setRefSpeed(1, head_speed[1])
-            self._ipos.setRefSpeed(2, head_speed[2])
-            self._ipos.setRefSpeed(3, eyes_speed[0])
-            self._ipos.setRefSpeed(4, eyes_speed[1])
-            self._ipos.setRefSpeed(5, eyes_speed[2])
-        
-        return {"topic": "logging_head_eye_speed",
-                "timestamp": time.time(), 
-                "command": f"head set to {head_speed} and eyes set to {eyes_speed}"},
-    
-    @MiddlewareCommunicator.register("NativeObject", "$_mware",
-                                     "ICub", "/icub_controller/logs/head_eye_coordinates",
+            self._ipos.setRefSpeed(0, pitch)
+            self._ipos.setRefSpeed(1, roll)
+            self._ipos.setRefSpeed(2, yaw)
+
+            return {"topic": "logging_head_speed",
+                    "timestamp": time.time(),
+                    "command": f"head speed set to {pitch, roll, yaw} (pitch, roll, yaw)"},
+
+    @MiddlewareCommunicator.register("NativeObject", "$mware",
+                                     "ICub", "/icub_controller/logs/eye_speed",
                                      should_wait=False)
-    def control_gaze(self, head=(0, 0, 0), eyes=(0, 0, 0), _mware=MWARE):
+    def update_eye_gaze_speed(self, pitch=10.0, yaw=10.0, vergence=20.0, eye=0.5, _mware=MWARE):
         """
-        Control the iCub head or eyes.
-        :param head: tuple(float->pitch[deg], float->yaw[deg], float->roll[deg]): Head orientation coordinates
-        :param eyes: tuple(float->pitch[deg], float->yaw[deg], float->vergence[0,1]): Eyes orientation coordinates
+        Control the iCub eye speed.
+        :param pitch: float->pitch[deg/s]: Pitch speed
+        :param yaw: float->yaw[deg/s]: Yaw speed
+        :param vergence: float->vergence[deg/s]: Speed of vergence shift between the eyes
+        :param eye: float->speed[0,1]: Eye trajectory speed in normalized units (only when using iKinGazeCtrl)
         :param _mware: str: Middleware to use
-        :return: dict: Orientation coordinates log for a given time step
+        :return: dict: Eye orientation speed log for a given time step
+        """
+        if self.ikingaze:
+            self._igaze.setEyesTrajTime(eye)
+
+            return {"topic": "logging_eye_speed",
+                    "timestamp": time.time(),
+                    "command": f"eye speed set to {eye}"},
+        else:
+            self._ipos.setRefSpeed(3, pitch)
+            self._ipos.setRefSpeed(4, yaw)
+            self._ipos.setRefSpeed(5, vergence)
+
+            return {"topic": "logging_eye_speed",
+                    "timestamp": time.time(),
+                    "command": f"eye speed set to {pitch, yaw, vergence} (pitch, yaw, vergence)"},
+
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
+                                     "ICub", "/icub_controller/logs/head_orientation_coordinates",
+                                     should_wait=False)
+    def control_head_gaze(self, pitch=0.0, roll=0.0, yaw=0.0, _mware=MWARE, **kwargs):
+        """
+        Control the iCub head relative to previous coordinates (initialized at 0 looking straight ahead).
+        :param pitch: float->pitch[deg]: Pitch angle
+        :param roll: float->roll[deg]: Roll angle
+        :param yaw: float->yaw[deg]: Yaw angle
+        :param _mware: str: Middleware to use
+        :return: dict: Head orientation coordinates log for a given time step
         """
         # wait for the action to complete
         # self.wait_for_gaze(reset=False)
@@ -388,31 +465,58 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self.init_pos = yarp.Vector(self._num_jnts, self._encs.data())
 
         # head control
-        self.init_pos.set(0, self.init_pos.get(0) + head[0])  # tilt/pitch
-        self.init_pos.set(1, self.init_pos.get(1) + head[1])  # swing/roll
-        self.init_pos.set(2, self.init_pos.get(2) + head[2])  # pan/yaw
-        # eye control
-        self.init_pos.set(3, self.init_pos.get(3) + eyes[0])  # eye tilt
-        self.init_pos.set(4, self.init_pos.get(4) + eyes[1])  # eye pan
-        self.init_pos.set(5, self.init_pos.get(5) + eyes[2]) # the divergence between the eyes (to align, set to 0)
+        self.init_pos.set(0, self.init_pos.get(0) + pitch)  # tilt/pitch
+        self.init_pos.set(1, self.init_pos.get(1) + roll)  # swing/roll
+        self.init_pos.set(2, self.init_pos.get(2) + yaw)  # pan/yaw
 
         self._ipos.positionMove(self.init_pos.data())
-        self._curr_head = list(head)
-        self._curr_eyes = list(eyes)
+        self._curr_head = list((pitch, roll, yaw))
 
-        return {"topic": "logging_head_eye_coordinates",
+        return {"topic": "logging_head_coordinates",
                 "timestamp": time.time(), 
-                "command": f"head set to {head} and eyes set to {eyes}"},
+                "command": f"head orientation set to {self._curr_head} (pitch, roll, yaw)"},
+
+    @MiddlewareCommunicator.register("NativeObject", "$_mware",
+                                     "ICub", "/icub_controller/logs/eye_orientation_coordinates",
+                                     should_wait=False)
+    def control_eye_gaze(self, pitch=0.0, yaw=0.0, vergence=0.0, _mware=MWARE, **kwargs):
+        """
+        Control the iCub eyes relative to previous coordinates (initialized at 0 looking straight ahead).
+        :param pitch: float->pitch[deg]: Pitch angle
+        :param yaw: float->yaw[deg]: Yaw (version) angle
+        :param vergence: float->yaw[deg]: Vergence angle between the eyes
+        :param _mware: str: Middleware to use
+        :return: dict: Eye orientation coordinates log for a given time step
+        """
+        # wait for the action to complete
+        # self.wait_for_gaze(reset=False)
+
+        # initialize a new tmp vector identical to encs
+        self.init_pos = yarp.Vector(self._num_jnts, self._encs.data())
+
+        # eye control
+        self.init_pos.set(3, self.init_pos.get(3) + pitch)  # eye tilt
+        self.init_pos.set(4, self.init_pos.get(4) + yaw)  # eye pan/version
+        self.init_pos.set(5, self.init_pos.get(5) + vergence)  # the vergence between the eyes (to align, set to 0)
+
+        self._ipos.positionMove(self.init_pos.data())
+        self._curr_eyes = list((pitch, yaw, vergence))
+
+        return {"topic": "logging_eye_coordinates",
+                "timestamp": time.time(),
+                "command": f"eye orientation set to {self._curr_eyes} (pitch, yaw, vergence)"},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/gaze_plane_coordinates",
                                      should_wait=False)
-    def control_gaze_at_plane(self, xy=(0, 0,), limiting_consts_xy=(0.3, 0.3), control_eyes=True, control_head=True,
+    def control_gaze_at_plane(self, x=0.0, y=0.0, limit_x=0.3, limit_y=0.3, control_eyes=True, control_head=True,
                               _mware=MWARE):
         """
         Gaze at specific point in a normalized plane in front of the iCub.
-        :param xy: tuple(float->x[-1,1],float->y[-1,1]): Position limited to the range of -1 (bottom left) and 1 (top right)
-        :param limiting_consts_xy: tuple(float->x[0,1],float->y[0,1]): Limiting constants for the x and y coordinates
+        :param x: float->x[-1,1]: x coordinate in the plane limited to the range of -1 (left) and 1 (right)
+        :param y: float->y[-1,1]: y coordinate in the plane limited to the range of -1 (bottom) and 1 (top)
+        :param limit_x: float->limit_x[0,1]: x coordinate limit in the plane
+        :param limit_y: float->limit_y[0,1]: y coordinate limit in the plane
         :param control_eyes: bool: Whether to control the eyes of the robot directly
         :param control_head: bool: Whether to control the head of the robot directly
         :return: dict: Gaze coordinates log for a given time step
@@ -420,7 +524,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         # wait for the action to complete
         # self.wait_for_gaze(reset=False)
 
-        xy = np.array(xy) * np.array(limiting_consts_xy)  # limit viewing region
+        xy = np.array((x,y)) * np.array((limit_x, limit_y))  # limit viewing region
         ptr = cartesian_to_spherical((1, xy[0], -xy[1]))
         # initialize a new tmp vector identical to encs
         ptr_degrees = (np.rad2deg(ptr[0]), np.rad2deg(ptr[1]))
@@ -428,7 +532,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         if control_eyes and control_head:
             if not self.ikingaze:
                 logging.error("Set ikingaze=True in order to move eyes and head simultaneously")
-                return
+                return None,
             self.init_pos_ikin = yarp.Vector(3, self._gaze_encs.data())
             self.init_pos_ikin.set(0, ptr_degrees[0])
             self.init_pos_ikin.set(1, ptr_degrees[1])
@@ -436,9 +540,15 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             self._igaze.lookAtAbsAngles(self.init_pos_ikin)
 
         elif control_head:
-            self.control_gaze(head=(ptr_degrees[1], 0, ptr_degrees[0]))
+            if self.ikingaze:
+                logging.error("Set ikingaze=False in order to move head only")
+                return None,
+            self.control_head_gaze(pitch=ptr_degrees[1], roll=0, yaw=ptr_degrees[0])
         elif control_eyes:
-            self.control_gaze(eyes=(ptr_degrees[1], ptr_degrees[0], 0))
+            if self.ikingaze:
+                logging.error("Set ikingaze=False in order to move eyes only")
+                return None,
+            self.control_eye_gaze(pitch=ptr_degrees[1], yaw=ptr_degrees[0], vergence=0)
 
         return {"topic": "logging_gaze_plane_coordinates",
                 "timestamp": time.time(),
@@ -606,28 +716,59 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             self.update_facial_expressions(switch_emotion.get("emotion_category", None),
                                            part=switch_emotion.get("part", False), _mware=self.MWARE)
 
-        move_robot, = self.acquire_head_eye_coordinates(head_eye_coordinates_port=self.HEAD_EYE_COORDINATES_PORT,
+        # move robot head
+        move_robot_head, = self.acquire_head_coordinates(head_coordinates_port=self.HEAD_COORDINATES_PORT,
                                                         cv2_key=k, _mware=self.MWARE)
-        if move_robot is not None and isinstance(move_robot, dict):
-            self.update_gaze_speed(head_speed=move_robot.get("head_speed", (10.0, 10.0, 20.0)),
-                                eyes_speed=move_robot.get("eyes_speed", (10.0, 10.0, 20.0)), _mware=self.MWARE)
-            if move_robot.get("reset_gaze", False):
+        if move_robot_head is not None and isinstance(move_robot_head, dict):
+            robot_head_speed = move_robot_head.get("speed", False)
+            if robot_head_speed and isinstance(robot_head_speed, dict):
+                self.update_head_gaze_speed(pitch=robot_head_speed.get("pitch", 10.0),
+                                            roll=robot_head_speed.get("roll", 10.0),
+                                            yaw=robot_head_speed.get("yaw", 20.0), _mware=self.MWARE)
+            if move_robot_head.get("reset_gaze", False):
                 self.reset_gaze()
-            self.control_gaze(head=move_robot.get("head", (0, 0, 0)), eyes=move_robot.get("eyes", (0, 0, 0)),
-                              _mware=self.MWARE)
+            self.control_head_gaze(pitch=move_robot_head.get("pitch", 0.0),
+                                   roll=move_robot_head.get("roll", 0.0),
+                                   yaw=move_robot_head.get("yaw", 0.0), _mware=self.MWARE)
+
+        # move robot eyes
+        move_robot_eyes, = self.acquire_eye_coordinates(head_coordinates_port=self.EYE_COORDINATES_PORT,
+                                                             cv2_key=k, _mware=self.MWARE)
+        if move_robot_eyes is not None and isinstance(move_robot_eyes, dict):
+            robot_eye_speed = move_robot_eyes.get("speed", False)
+            if robot_eye_speed and isinstance(robot_eye_speed, dict):
+                self.update_eye_gaze_speed(pitch=robot_eye_speed.get("pitch", 10.0),
+                                           yaw=robot_eye_speed.get("yaw", 10.0),
+                                           vergence=robot_eye_speed.get("vergence", 20.0), _mware=self.MWARE)
+            if move_robot_eyes.get("reset_gaze", False):
+                self.reset_gaze()
+            self.control_eye_gaze(pitch=move_robot_eyes.get("pitch", 0.0),
+                                   yaw=move_robot_eyes.get("yaw", 0.0),
+                                  vergence=move_robot_eyes.get("vergence", 0.0), _mware=self.MWARE)
 
         move_robot, = self.receive_gaze_plane_coordinates(gaze_plane_coordinates_port=self.GAZE_PLANE_COORDINATES_PORT,
                                                           _mware=self.MWARE)
         if move_robot is not None and isinstance(move_robot, dict):
-            self.update_gaze_speed(head_speed=move_robot.get("head_speed", (10.0, 10.0, 20.0) if not self.ikingaze else 0.8),
-                                   eyes_speed=move_robot.get("eyes_speed", (10.0, 10.0, 20.0) if not self.ikingaze else 0.5),
-                                   _mware=self.MWARE)
+            robot_eye_speed = move_robot.get("eye_speed", False)
+            if robot_eye_speed and isinstance(robot_eye_speed, dict):
+                self.update_eye_gaze_speed(**{"pitch": robot_eye_speed.get("pitch", 10.0),
+                                              "yaw": robot_eye_speed.get("yaw", 10.0),
+                                              "vergence": robot_eye_speed.get("vergence", 20.0), "_mware":self.MWARE}
+                if not self.ikingaze else {"eye": robot_eye_speed.get("eye", 0.5), "_mware":self.MWARE})
+
+            robot_head_speed = move_robot.get("head_speed", False)
+            if robot_head_speed and isinstance(robot_head_speed, dict):
+                self.update_head_gaze_speed(**{"pitch": robot_head_speed.get("pitch", 10.0),
+                                               "roll": robot_head_speed.get("roll", 10.0),
+                                               "yaw": robot_head_speed.get("yaw", 20.0), "_mware":self.MWARE}
+                if not self.ikingaze else {"head": robot_head_speed.get("head", 0.8), "_mware":self.MWARE})
+
             if move_robot.get("reset_gaze", False):
                 self.reset_gaze()
-            self.control_gaze_at_plane(xy=move_robot.get("xy", (0, 0)),
-                                        limiting_consts_xy=move_robot.get("limiting_consts_xy", (0.3, 0.3)),
-                                        control_head=move_robot.get("control_head", False if not self.ikingaze else True),
-                                        control_eyes=move_robot.get("control_eyes", True), _mware=self.MWARE),
+            self.control_gaze_plane_coordinates(x=move_robot.get("x", 0.0), y=move_robot.get("y", 0.0),
+                                                limit_x=move_robot.get("limit_x", 0.3), limit_y=move_robot.get("limit_y", 0.3),
+                                                control_head=move_robot.get("control_head", False if not self.ikingaze else True),
+                                                control_eyes=move_robot.get("control_eyes", True), _mware=self.MWARE),
 
         return True
 
@@ -638,12 +779,18 @@ def parse_args():
     parser.add_argument("--headless", action="store_true", help="Disable CV2 GUI")
     parser.add_argument("--ikingaze", action="store_true", help="Enable iKinGazeCtrl")
     parser.add_argument("--get_cam_feed", action="store_true", help="Get the camera feeds from the robot")
-    parser.add_argument("--control_head", action="store_true", help="Control the head and eyes")
-    parser.add_argument("--set_head_eye_coordinates", action="store_true",
-                        help="Publish head+eye coordinates set using keyboard commands")
-    parser.add_argument("--head_eye_coordinates_port", type=str, default="",
-                        help="The port (topic) name used for receiving and transmitting head and eye orientation "
-                             "Setting the port name without --set_head_eye_coordinates will only receive the coordinates")
+    parser.add_argument("--control_head", action="store_true", help="Control the head")
+    parser.add_argument("--set_head_coordinates", action="store_true",
+                        help="Publish head coordinates set using keyboard commands")
+    parser.add_argument("--head_coordinates_port", type=str, default="",
+                        help="The port (topic) name used for receiving and transmitting head orientation "
+                             "Setting the port name without --set_head_coordinates will only receive the coordinates")
+    parser.add_argument("--control_eyes", action="store_true", help="Control the eyes")
+    parser.add_argument("--set_eye_coordinates", action="store_true",
+                        help="Publish eye coordinates set using keyboard commands")
+    parser.add_argument("--eye_coordinates_port", type=str, default="",
+                        help="The port (topic) name used for receiving and transmitting eye orientation "
+                             "Setting the port name without --set_eye_coordinates will only receive the coordinates")
     parser.add_argument("--gaze_plane_coordinates_port", type=str, default="",
                         help="The port (topic) name used for receiving plane coordinates in 2D for robot to look at")
     parser.add_argument("--control_expressions", action="store_true", help="Control the facial expressions")
