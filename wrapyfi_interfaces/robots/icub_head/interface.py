@@ -493,6 +493,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         """
         if order != "xyz":
             logging.error("only accepts ratation angles following the order='xyz' convention")
+            return None,
         # wait for the action to complete
         # self.wait_for_gaze(reset=False)
 
