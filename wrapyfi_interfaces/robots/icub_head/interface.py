@@ -64,6 +64,14 @@ EMOTION_LOOKUP = {
 
 
 class ICub(MiddlewareCommunicator, yarp.RFModule):
+    """
+    ICub head controller, facial expression transmitter and camera viewer. Head control is not can be achieved following two methods:
+    1. Using the `control_head_gaze` method, which controls the head gaze in the spherical coordinate system.
+    2. Using the `control_gaze_at_plane` method, which controls the head gaze in the cartesian coordinate system.
+    Emotions can be controlled using the `update_facial_expressions` method.
+    Camera feed can be viewed using the `receive_images` method.
+    """
+
     MWARE = ICUB_DEFAULT_COMMUNICATOR
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
@@ -84,6 +92,27 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                  control_expressions=False,
                  set_facial_expressions=True, facial_expressions_port=FACIAL_EXPRESSIONS_PORT,
                  mware=MWARE):
+        """
+        Initialize the ICub head controller, facial expression transmitter and camera viewer.
+        :param simulation: bool: Whether to run the simulation or not
+        :param headless: bool: Whether to run the headless mode or not
+        :param get_cam_feed: bool: Whether to get (listen) the camera feed or not
+        :param img_width: int: Width of the image
+        :param img_height: int: Height of the image
+        :param control_head: bool: Whether to control the head
+        :param set_head_coordinates: bool: Whether to set (publish) the head coordinates
+        :param head_coordinates_port: str: Port to receive the head coordinates for controlling the head
+        :param control_eyes: bool: Whether to control the eyes
+        :param set_eye_coordinates: bool: Whether to set (publish) the eye coordinates
+        :param eye_coordinates_port: str: Port to receive the eye coordinates for controlling the eyes
+        :param ikingaze: bool: Whether to use the iKinGazeCtrl
+        :param gaze_plane_coordinates_port: str: Port to receive the gaze plane coordinates for controlling the head/eyes
+        :param control_expressions: bool: Whether to control the facial expressions
+        :param set_facial_expressions: bool: Whether to set (publish) the facial expressions
+        :param facial_expressions_port: str: Port to receive the facial expressions for controlling the facial expressions
+        :param mware: str: Middleware to use
+        """
+
         self.__name__ = "iCubController"
         MiddlewareCommunicator.__init__(self)
         yarp.RFModule.__init__(self)
@@ -230,7 +259,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         ICub.wait_for_gaze.__defaults__ = (True, self.MWARE)
         ICub.reset_gaze.__defaults__ = (self.MWARE,)
         ICub.update_head_gaze_speed.__defaults__ = (10.0, 10.0, 20.0, 0.8, self.MWARE)
-        ICub.control_head_gaze.__defaults__ = (0.0, 0.0, 0.0, self.MWARE)
+        ICub.control_head_gaze.__defaults__ = (0.0, 0.0, 0.0, "xyz", self.MWARE)
         ICub.update_eye_gaze_speed.__defaults__ = (10.0, 10.0, 20.0, 0.5, self.MWARE)
         ICub.control_eye_gaze.__defaults__ = (0.0, 0.0, 0.0, self.MWARE)
         ICub.control_gaze_at_plane.__defaults__ = (0, 0, 0.3, 0.3, True, True, self.MWARE)
@@ -289,7 +318,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                     "timestamp": time.time(),
                     "pitch": self._curr_head[0],
                     "roll": self._curr_head[1],
-                    "yaw": self._curr_head[2]},
+                    "yaw": self._curr_head[2],
+                    "order": "zyx"},
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "$eye_coordinates_port",
@@ -450,15 +480,19 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
                                      "ICub", "/icub_controller/logs/head_orientation_coordinates",
                                      should_wait=False)
-    def control_head_gaze(self, pitch=0.0, roll=0.0, yaw=0.0, _mware=MWARE, **kwargs):
+    def control_head_gaze(self, pitch=0.0, roll=0.0, yaw=0.0, order="xyz", _mware=MWARE, **kwargs):
         """
-        Control the iCub head relative to previous coordinates (initialized at 0 looking straight ahead).
+        Control the iCub head relative to previous coordinates following the roll,pitch,yaw convention (order=xyz)
+        (initialized at 0 looking straight ahead).
         :param pitch: float->pitch[deg]: Pitch angle
         :param roll: float->roll[deg]: Roll angle
         :param yaw: float->yaw[deg]: Yaw angle
+        :param order: str: Euler axis order. Only accepts xyz (roll, pitch, yaw)
         :param _mware: str: Middleware to use
         :return: dict: Head orientation coordinates log for a given time step
         """
+        if order != "xyz":
+            logging.error("only accepts ratation angles following the order='xyz' convention")
         # wait for the action to complete
         # self.wait_for_gaze(reset=False)
 
@@ -526,13 +560,13 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         # self.wait_for_gaze(reset=False)
 
         xy = np.array((x,y)) * np.array((limit_x, limit_y))  # limit viewing region
-        ptr = cartesian_to_spherical((1, xy[0], -xy[1]))
+        ptr = cartesian_to_spherical(x=1, y=xy[0], z=-xy[1], expand_return=False)
         # initialize a new tmp vector identical to encs
         ptr_degrees = (np.rad2deg(ptr[0]), np.rad2deg(ptr[1]))
 
         if control_eyes and control_head:
             if not self.ikingaze:
-                logging.error("Set ikingaze=True in order to move eyes and head simultaneously")
+                logging.error("set ikingaze=True in order to move eyes and head simultaneously")
                 return None,
             self.init_pos_ikin = yarp.Vector(3, self._gaze_encs.data())
             self.init_pos_ikin.set(0, ptr_degrees[0])
@@ -542,12 +576,12 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         elif control_head:
             if self.ikingaze:
-                logging.error("Set ikingaze=False in order to move head only")
+                logging.error("set ikingaze=False in order to move head only")
                 return None,
             self.control_head_gaze(pitch=ptr_degrees[1], roll=0, yaw=ptr_degrees[0])
         elif control_eyes:
             if self.ikingaze:
-                logging.error("Set ikingaze=False in order to move eyes only")
+                logging.error("set ikingaze=False in order to move eyes only")
                 return None,
             self.control_eye_gaze(pitch=ptr_degrees[1], yaw=ptr_degrees[0], vergence=0)
 

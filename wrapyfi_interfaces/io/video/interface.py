@@ -5,7 +5,6 @@ import time
 from queue import Queue
 from threading import Thread
 import os
-import functools
 
 import cv2
 import numpy as np
@@ -38,13 +37,14 @@ class _VideoCapture(cv2.VideoCapture):
 
 class VideoCapture(MiddlewareCommunicator, _VideoCapture):
     """
-        Video capturer with closer resemblance to cv2.VideoCapture rather than the naming conventions of
-        Wrapyfi interfaces. To invoke Wrapyfi functionality (publishing to a port), set the cap_feed_port and trigger
-        the runModule() (automatically invoked in standalone mode), or call the acquire_image() method with all necessary
-        arguments. when invoking the acquire_image method directly, make sure to pass all port (topic) arguments.
-        Calling retrieve() and read() automatically invokes acquire_image with constructor arguments (e.g. image_width)
-        automatically passed
+    Video capturer with closer resemblance to cv2.VideoCapture rather than the naming conventions of
+    Wrapyfi interfaces. To invoke Wrapyfi functionality (publishing to a port), set the cap_feed_port and trigger
+    the runModule() (automatically invoked in standalone mode), or call the acquire_image() method with all necessary
+    arguments. when invoking the acquire_image method directly, make sure to pass all port (topic) arguments.
+    Calling retrieve() and read() automatically invokes acquire_image with constructor arguments (e.g. image_width)
+    automatically passed.
     """
+
     MWARE = CAMERA_DEFAULT_COMMUNICATOR
     CAP_PROP_FRAME_WIDTH = 320
     CAP_PROP_FRAME_HEIGHT = 240
@@ -55,6 +55,21 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
     def __init__(self, cap_source, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
                  headless=False, should_wait=False, multithreading=True, queue_size=10, force_resize=False,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, mware=MWARE, **kwargs):
+        """
+        :param cap_source: str: The source of the video stream. Can be a file path, a camera index, or a URL
+        :param cap_feed_port: str: The port to publish the video stream to
+        :param cap_feed_carrier: str: The mware-specific carrier to publish the video stream to (tcp,, udp, mcast, ...)
+        :param headless: bool: Whether to NOT display the video stream
+        :param should_wait: bool: Whether to wait for a subscriber before publishing the video stream
+        :param multithreading: bool: Whether to use multithreading to read the video stream
+        :param queue_size: int: Size of the queue to use for multithreading
+        :param force_resize: bool: Whether to force the resizing of the video stream
+        :param img_width: int: Width of the video stream image
+        :param img_height: int: Height of the video stream image
+        :param fps: int: Frames per second of the video stream
+        :param mware: str: Middleware to use for publishing the video stream
+        """
+
         MiddlewareCommunicator.__init__(self)
 
         self.MWARE = mware
@@ -107,6 +122,10 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
         self.build()
 
     def build(self):
+        """
+        Updates the default method arguments according to constructor arguments. This method is called by the module constructor.
+        It is not necessary to call it manually.
+        """
         VideoCapture.acquire_image.__defaults__ = (self.CAP_FEED_PORT, self.CAP_FEED_CARRIER,
                                                    self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT,
                                                    self.SHOULD_WAIT, self.MWARE)
@@ -134,6 +153,16 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
     def acquire_image(self, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
                       img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
                       _should_wait=SHOULD_WAIT, _mware=MWARE, **kwargs):
+        """
+        Acquires an image from the video stream and publishes it to the specified port.
+        :param cap_feed_port: str: The port to publish the video stream to
+        :param cap_feed_carrier: str: The mware-specific carrier to publish the video stream to (tcp,, udp, mcast, ...)
+        :param img_width: int: Width of the video stream image
+        :param img_height: int: Height of the video stream image
+        :param _should_wait: bool: Whether to wait for a subscriber before publishing the video stream
+        :param _mware: str: Middleware to use for publishing the video stream
+        """
+
         if self.isOpened():
             if kwargs.get("_internal_call", False):
                 grabbed = kwargs.get("_grabbed", None)
@@ -191,6 +220,10 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             return grabbed, img
 
     def getPeriod(self):
+        """
+        Get the period of the module.
+        :return: float: Period of the module (1/fps)
+        """
         return 1.0 / self.fps
 
     def updateModule(self):
@@ -247,6 +280,19 @@ class VideoCaptureReceiver(VideoCapture):
     def __init__(self, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
                  headless=False, should_wait=SHOULD_WAIT, multithreading=False,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, mware=MWARE, **kwargs):
+        """
+        Receives a video stream from the specified port and displays it.
+        :param cap_feed_port: str: The port to receive the video stream from
+        :param cap_feed_carrier: str: The mware-specific carrier to receive the video stream from (tcp,, udp, mcast, ...)
+        :param headless: bool: Whether to display the video stream
+        :param should_wait: bool: Whether to wait for a publisher before receiving the video stream
+        :param multithreading: bool: Whether to use multithreading to receive the video stream (always set to False)
+        :param img_width: int: Width of the video stream image
+        :param img_height: int: Height of the video stream image
+        :param fps: int: Frames per second of the video stream
+        :param mware: str: Middleware to use for receiving the video stream
+        """
+
         VideoCapture.__init__(self, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
                               headless=headless, should_wait=should_wait, img_width=False, img_height=False,
                               fps=False, multithreading=False, mware=mware, **kwargs)

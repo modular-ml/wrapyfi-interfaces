@@ -6,16 +6,17 @@ from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
 
 class FacialExpressionsInterface(MiddlewareCommunicator):
+    """
+    Broadcast and receive emotion data using middleware of choice.
+    This template acts as a bridge between different middleware and/or ports (topics).
+    """
+
     PORT_OUT = "/control_interface/facial_expressions_out"
     MWARE_OUT = DEFAULT_COMMUNICATOR
     PORT_IN = "/control_interface/facial_expressions_in"
     MWARE_IN = DEFAULT_COMMUNICATOR
     SHOULD_WAIT = False
 
-    """
-    Broadcast and receive emotion data using middleware of choice.
-    This template acts as a bridge between different middleware and/or ports (topics).
-    """
     def __init__(self,
                  facial_expressions_port_out=PORT_OUT,
                  mware_out=MWARE_OUT,

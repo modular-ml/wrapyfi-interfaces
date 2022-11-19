@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(
-    name             = 'wrapyfi_interaces',
-    version          = '0.1.0',
+    name             = 'wrapyfi_interfaces',
+    version          = '0.2.0',
     description      = 'Wrapyfi interfaces for communicating with various devices',
     url              = 'https://github.com/modular-ml/wrapyfi-extensions/',
     author           = 'Fares Abawi',

@@ -5,16 +5,17 @@ from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
 
 class BoundingBoxInterface(MiddlewareCommunicator):
+    """
+    Broadcast and receive bounding box coordinates using middleware of choice.
+    This template acts as a bridge between different middleware and/or ports (topics).
+    """
+
     PORT_OUT = "/control_interface/bounding_box_out"
     MWARE_OUT = DEFAULT_COMMUNICATOR
     PORT_IN = "/control_interface/bounding_box_in"
     MWARE_IN = DEFAULT_COMMUNICATOR
     SHOULD_WAIT = False
 
-    """
-    Broadcast and receive bounding box coordinates using middleware of choice.
-    This template acts as a bridge between different middleware and/or ports (topics).
-    """
     def __init__(self,
                  bounding_box_port_out=PORT_OUT,
                  mware_out=MWARE_OUT,

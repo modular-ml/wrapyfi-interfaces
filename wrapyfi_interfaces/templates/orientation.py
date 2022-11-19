@@ -2,19 +2,21 @@ import time
 import argparse
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
+from wrapyfi_interfaces.utils.transformations import quaternion_to_euler, euler_to_quaternion
 
 
 class OrientationInterface(MiddlewareCommunicator):
+    """
+    Broadcast and receive orientation coordinates using middleware of choice.
+    This template acts as a bridge between different middleware and/or ports (topics).
+    """
+
     PORT_OUT = "/control_interface/orientation_out"
     MWARE_OUT = DEFAULT_COMMUNICATOR
     PORT_IN = "/control_interface/orientation_in"
     MWARE_IN = DEFAULT_COMMUNICATOR
     SHOULD_WAIT = False
 
-    """
-    Broadcast and receive orientation coordinates using middleware of choice.
-    This template acts as a bridge between different middleware and/or ports (topics).
-    """
     def __init__(self,
                  orientation_port_out=PORT_OUT,
                  mware_out=MWARE_OUT,
@@ -44,11 +46,17 @@ class OrientationInterface(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
                                      "$orientation_port", should_wait="$_should_wait")
-    def transmit_orientation(self, pitch=None, roll=None, yaw=None, speed=None,
+    def transmit_orientation(self, quaternion=None, order="zyx",
+                             pitch=None, roll=None, yaw=None, speed=None,
                              orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
         Publishes the orientation coordinates to the middleware.
-        :param pitch: float->pitch[deg]: Pitch angle in degrees
+        :param quaternion: list[float->quat_a[-1,1], float->quat_b[-1,1], float->quat_c[-1,1], float->quat_d[-1,1]]:
+                            Quaternion representing rotation. When not provided (None) and yaw, pitch, roll are
+                            provided, automatic conversion according to order is returned. False avoids conversion,
+                            When pitch, roll, and yaw provided, automatically returns quaternion
+        :param order: str: Euler axis order. Perturbations to xyz (roll, pitch, yaw) for intrinsic. XYZ for extrinsic
+        :param pitch: float->pitch[deg]: Pitch angle in degrees.
         :param roll: float->roll[deg]: Roll angle in degrees
         :param yaw: float->yaw[deg]: Yaw angle in degrees
         :param speed: dict{float->pitch[deg/s], float->roll[deg/s], float->yaw[deg/s], **kwargs}: Speed of trajectory
@@ -60,6 +68,14 @@ class OrientationInterface(MiddlewareCommunicator):
         :return: dict: Orientation coordinates for a given time step
         """
         returns = kwargs
+        returns.update(order=order)
+        if quaternion is not None:
+            returns["quaternion"] = quaternion
+            if quaternion and all((pitch is None, roll is None, yaw is None)):
+                returns.update(**quaternion_to_euler(quaternion=quaternion, order=order, expand_return=True))
+        elif all((pitch is not None, roll is not None, yaw is not None)):
+            returns.update(euler_to_quaternion(pitch=pitch, roll=roll, yaw=yaw, order=order, expand_return=False))
+
         if pitch is not None:
             returns["pitch"] = pitch
         if roll is not None:
