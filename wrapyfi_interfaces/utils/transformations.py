@@ -45,19 +45,19 @@ def euler_to_quaternion(euler=None, pitch=None, roll=None, yaw=None, order="xyz"
 
     rot = Rotation.from_euler(order, euler, degrees=True)
     rot_quat = rot.as_quat()
-    return rot_quat if not expand_return else {"quat_a": rot_quat[0],
-                                               "quat_b": rot_quat[1],
-                                               "quat_c": rot_quat[2],
-                                               "quat_d": rot_quat[3],
+    return rot_quat if not expand_return else {"quat_x": rot_quat[0],
+                                               "quat_y": rot_quat[1],
+                                               "quat_z": rot_quat[2],
+                                               "quat_w": rot_quat[3],
                                                "order": order}
 
 
-def quaternion_to_euler(quaternion=None, quat_a=None, quat_b=None, quat_c=None, quat_d=None, order="xyz", expand_return=None):
+def quaternion_to_euler(quaternion=None, quat_x=None, quat_y=None, quat_z=None, quat_w=None, order="xyz", expand_return=None):
     from operator import xor
     from scipy.spatial.transform import Rotation
 
-    assert xor((quaternion is not None), all((quat_a is not None, quat_b is not None,
-                                              quat_c is not None, quat_d is not None)))
+    assert xor((quaternion is not None), all((quat_x is not None, quat_y is not None,
+                                              quat_z is not None, quat_w is not None)))
 
     if expand_return is None:
         expand_return = False if quaternion is None else True

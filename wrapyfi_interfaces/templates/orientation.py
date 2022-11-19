@@ -51,7 +51,7 @@ class OrientationInterface(MiddlewareCommunicator):
                              orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
         Publishes the orientation coordinates to the middleware.
-        :param quaternion: list[float->quat_a[-1,1], float->quat_b[-1,1], float->quat_c[-1,1], float->quat_d[-1,1]]:
+        :param quaternion: list[float->quat_x[-1,1], float->quat_y[-1,1], float->quat_z[-1,1], float->quat_w[-1,1]]:
                             Quaternion representing rotation. When not provided (None) and yaw, pitch, roll are
                             provided, automatic conversion according to order is returned. False avoids conversion,
                             When pitch, roll, and yaw provided, automatically returns quaternion
