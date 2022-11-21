@@ -5,6 +5,8 @@ from collections import deque
 
 import cv2
 import numpy as np
+import rospy
+import pepper_extra.srv
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
 from wrapyfi_interfaces.utils.filters import mode_smoothing_filter
@@ -39,6 +41,17 @@ EMOTION_LOOKUP = {
     "Contempt": "evi"
 }
 
+EMOTION_LEDS_LOOKUP = {
+    "neu": "white",
+    "hap": "green",
+    "sad": "blue",
+    "sur": "yellow",
+    "shy": "cyan",
+    "cun": (1.0, 0.5, 0.0),
+    "ang": "red",
+    "evi": "magenta",
+}
+
 
 class Pepper(MiddlewareCommunicator):
 
@@ -49,6 +62,7 @@ class Pepper(MiddlewareCommunicator):
     FACIAL_EXPRESSIONS_PORT = "/control_interface/facial_expressions"
     FACIAL_EXPRESSIONS_QUEUE_SIZE = 50
     FACIAL_EXPRESSION_SMOOTHING_WINDOW = 6
+    LED_SERVICE = "/pepper/leds/set_rgb"
 
     def __init__(self, headless=False, get_cam_feed=True,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
@@ -78,6 +92,11 @@ class Pepper(MiddlewareCommunicator):
             # control emotional expressions
             self.last_expression = ["", ""]  # (emotion part on the robot's face , emotional expression category)
             self.expressions_queue = deque(maxlen=self.FACIAL_EXPRESSIONS_QUEUE_SIZE)
+            print("Waiting for Pepper services...")
+            rospy.wait_for_service(self.LED_SERVICE)
+            self.srv_set_rgbled = rospy.ServiceProxy(self.LED_SERVICE, pepper_extra.srv.LEDsSetRGB)
+            self.update_leds("neu")
+            print("Pepper services found")
         else:
             self.activate_communication(self.update_facial_expressions, "disable")
 
@@ -109,30 +128,29 @@ class Pepper(MiddlewareCommunicator):
                 pass
             elif cv2_key == 49:  # 1 key: sad emotion
                 emotion = "sad"
-                print("Info: Expressing sadness")
+                print("Keyed input emotion: sadness")
             elif cv2_key == 50:  # 2 key: angry emotion
                 emotion = "ang"
-                print("Info: Expressing anger")
+                print("Keyed input emotion: anger")
             elif cv2_key == 51:  # 3 key: happy emotion
                 emotion = "hap"
-                print("Info: Expressing happiness")
+                print("Keyed input emotion: happiness")
             elif cv2_key == 52:  # 4 key: neutral emotion
                 emotion = "neu"
-                print("Info: Expressing neutrality")
+                print("Keyed input emotion: neutrality")
             elif cv2_key == 53:  # 5 key: surprise emotion
                 emotion = "sur"
-                print("Info: Expressing surprise")
+                print("Keyed input emotion: surprise")
             elif cv2_key == 54:  # 6 key: shy emotion
                 emotion = "shy"
-                print("Info: Expressing shyness")
+                print("Keyed input emotion: shyness")
             elif cv2_key == 55:  # 7 key: evil emotion
                 emotion = "evi"
-                print("Info: Expressing evilness")
+                print("Keyed input emotion: evilness")
             elif cv2_key == 56:  # 8 key: cunning emotion
                 emotion = "cun"
-                print("Info: Expressing cunningness")
+                print("Keyed input emotion: cunningness")
             else:
-                print(f"Info: Other key {cv2_key}")  # else print its value
                 return None,
             return {"topic": facial_expressions_port.split("/")[-1],
                     "timestamp": time.time(),
@@ -149,18 +167,14 @@ class Pepper(MiddlewareCommunicator):
 
         if smoothing == "mode":
             self.expressions_queue.append(expression)
-            transmitted_expression = mode_smoothing_filter(list(self.expressions_queue), window_length=self.FACIAL_EXPRESSION_SMOOTHING_WINDOW)
+            transmitted_expression = mode_smoothing_filter(list(self.expressions_queue), default="neu", window_length=self.FACIAL_EXPRESSION_SMOOTHING_WINDOW)
         else:
             transmitted_expression = expression
 
         if self.last_expression[0] == part and self.last_expression[1] == transmitted_expression:
             pass
         elif part == "LIGHTS":  # or whatever part you want to control
-            # TODO: CONTROLLING THE ROBOT FACIAL EXPRESSION HAPPENS HERE
-            pass
-        else:
-            # TODO: CONTROLLING THE ROBOT FACIAL EXPRESSION HAPPENS HERE
-            pass
+            self.update_leds(transmitted_expression)
 
         self.last_expression[0] = part
         self.last_expression[1] = transmitted_expression
@@ -168,6 +182,12 @@ class Pepper(MiddlewareCommunicator):
         return {"topic": "logging_facial_expressions",
                 "timestamp": time.time(),
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},
+
+    def update_leds(self, emotion):
+        print(f"Showing emotion {emotion}")
+        color = EMOTION_LEDS_LOOKUP[emotion]
+        r, g, b = color if isinstance(color, tuple) else (0.0, 0.0, 0.0)
+        self.srv_set_rgbled('AllLeds', color if isinstance(color, str) else '', r, g, b, 0.5, False)
 
     @MiddlewareCommunicator.register("Image", "ros", "Pepper", "$cam_front_port", width="$img_width", height="$img_height", rgb="$_rgb")
     def receive_images(self, cam_front_port, img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, _rgb=True):

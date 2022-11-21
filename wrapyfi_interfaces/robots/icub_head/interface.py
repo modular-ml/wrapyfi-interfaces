@@ -670,7 +670,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         if smoothing == "mode":
             self.expressions_queue.append(expression)
-            transmitted_expression = mode_smoothing_filter(list(self.expressions_queue),
+            transmitted_expression = mode_smoothing_filter(list(self.expressions_queue), default="neu",
                                                       window_length=self.FACIAL_EXPRESSION_SMOOTHING_WINDOW)
         else:
             transmitted_expression = expression
