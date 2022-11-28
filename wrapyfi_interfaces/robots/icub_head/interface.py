@@ -65,7 +65,7 @@ EMOTION_LOOKUP = {
 
 class ICub(MiddlewareCommunicator, yarp.RFModule):
     """
-    ICub head controller, facial expression transmitter and camera viewer. Head control is not can be achieved following two methods:
+    ICub head controller, facial expression transmitter and camera viewer. Head control can be achieved following two methods:
     1. Using the `control_head_gaze` method, which controls the head gaze in the spherical coordinate system.
     2. Using the `control_gaze_at_plane` method, which controls the head gaze in the cartesian coordinate system.
     Emotions can be controlled using the `update_facial_expressions` method.
