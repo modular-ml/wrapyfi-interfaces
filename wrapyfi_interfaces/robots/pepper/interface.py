@@ -224,7 +224,7 @@ def parse_args():
     parser.add_argument("--control_expressions", action="store_true", help="Control the facial expressions")
     parser.add_argument("--set_facial_expressions", action="store_true",
                         help="Publish facial expressions set using keyboard commands")
-    parser.add_argument("--facial_expressions_port", type=str, default="",
+    parser.add_argument("--facial_expressions_port", type=str, default="/control_interface/facial_expressions",
                         help="The port (topic) name used for receiving and transmitting facial expressions. "
                              "Setting the port name without --set_facial_expressions will only receive the facial expressions")
     parser.add_argument("--mware", type=str, default=PEPPER_DEFAULT_COMMUNICATOR,
@@ -238,6 +238,6 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    assert not (args.headless and (args.set_facial_expressions or args.set_head_eye_coordinates)), "Setters require a CV2 window for capturing keystrokes. Disable --set_* for running in headless mode"
+    assert not (args.headless and args.set_facial_expressions), "Setters require a CV2 window for capturing keystrokes. Disable --set_* for running in headless mode"
     controller = Pepper(**vars(args))
     controller.runModule()
