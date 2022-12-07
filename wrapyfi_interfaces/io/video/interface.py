@@ -293,7 +293,7 @@ class VideoCaptureReceiver(VideoCapture):
         :param mware: str: Middleware to use for receiving the video stream
         """
 
-        VideoCapture.__init__(self, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
+        VideoCapture.__init__(self, cap_source=False, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
                               headless=headless, should_wait=should_wait, img_width=False, img_height=False,
                               fps=False, multithreading=False, mware=mware, **kwargs)
 
