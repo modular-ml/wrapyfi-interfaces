@@ -52,7 +52,7 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
     CAP_FEED_CARRIER = ""
     SHOULD_WAIT = False
 
-    def __init__(self, cap_source, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
+    def __init__(self, cap_source=False, cap_feed_port=CAP_FEED_PORT, cap_feed_carrier=CAP_FEED_CARRIER,
                  headless=False, should_wait=False, multithreading=True, queue_size=10, force_resize=False,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, fps=30, mware=MWARE, **kwargs):
         """
@@ -293,7 +293,7 @@ class VideoCaptureReceiver(VideoCapture):
         :param mware: str: Middleware to use for receiving the video stream
         """
 
-        VideoCapture.__init__(self, cap_source=False, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
+        VideoCapture.__init__(self, cap_feed_port="", cap_feed_carrier=cap_feed_carrier,
                               headless=headless, should_wait=should_wait, img_width=False, img_height=False,
                               fps=False, multithreading=False, mware=mware, **kwargs)
 
