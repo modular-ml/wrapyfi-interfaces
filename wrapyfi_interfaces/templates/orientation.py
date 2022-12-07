@@ -46,7 +46,7 @@ class OrientationInterface(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
                                      "$orientation_port", should_wait="$_should_wait")
-    def transmit_orientation(self, quaternion=None, order="zyx",
+    def transmit_orientation(self, quaternion=None, order="xyz",
                              pitch=None, roll=None, yaw=None, speed=None,
                              orientation_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
