@@ -46,7 +46,7 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
         FacialExpressionsInterface.receive_emotion.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "FacialExpressionsInterface",
-                                     "$_facial_expressions_port", should_wait="$_should_wait")
+                                     "$facial_expressions_port", should_wait="$_should_wait")
     def transmit_emotion(self, emotion_category=None, emotion_continuous=None, emotion_index=None,
                          facial_expressions_port=PORT_OUT, _should_wait=SHOULD_WAIT, _mware=MWARE_OUT, **kwargs):
         """
