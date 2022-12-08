@@ -41,7 +41,7 @@ class OrientationInterface(MiddlewareCommunicator):
         Updates the default method arguments according to constructor arguments. This method is called by the module constructor.
         It is not necessary to call it manually.
         """
-        OrientationInterface.transmit_orientation.__defaults__ = (None, None, None, None, self.PORT_OUT, self.SHOULD_WAIT, self.MWARE_OUT)
+        OrientationInterface.transmit_orientation.__defaults__ = (None, "xyz", None, None, None, None, self.PORT_OUT, self.SHOULD_WAIT, self.MWARE_OUT)
         OrientationInterface.receive_orientation.__defaults__ = (self.PORT_IN, self.SHOULD_WAIT, self.MWARE_IN)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",  "OrientationInterface",
