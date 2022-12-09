@@ -118,8 +118,8 @@ class VideoCapture(MiddlewareCommunicator, _VideoCapture):
             self.thread = Thread(target=self.update, args=())
             self.thread.daemon = True
             self.thread.start()
-
-        self.build()
+        if cap_source:
+            self.build()
 
     def build(self):
         """
