@@ -254,7 +254,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         Updates the default method arguments according to constructor arguments. This method is called by the module constructor.
         It is not necessary to call it manually.
         """
-        ICub.acquire_head_eye_coordinates.__defaults__ = (self.HEAD_COORDINATES_PORT, None, self.MWARE)
+        ICub.acquire_head_coordinates.__defaults__ = (self.HEAD_COORDINATES_PORT, None, self.MWARE)
+        ICub.acquire_eye_coordinates.__defaults__ = (self.EYE_COORDINATES_PORT, None, self.MWARE)
         ICub.receive_gaze_plane_coordinates.__defaults__ = (self.GAZE_PLANE_COORDINATES_PORT, self.MWARE)
         ICub.wait_for_gaze.__defaults__ = (True, self.MWARE)
         ICub.reset_gaze.__defaults__ = (self.MWARE,)
