@@ -14,6 +14,7 @@ PUPIL_CORE_DEFAULT_COMMUNICATOR = os.environ.get("PUPIL_CORE_DEFAULT_COMMUNICATO
 PUPIL_CORE_DEFAULT_COMMUNICATOR = os.environ.get("PUPIL_CORE_DEFAULT_MWARE", PUPIL_CORE_DEFAULT_COMMUNICATOR)
 
 
+
 def check_capture_exists(ip_address, port):
     """check pupil capture instance exists"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -150,15 +151,16 @@ class PupilCore(MiddlewareCommunicator):
     RECORDING_MESSAGE_PORT = "/pupil_core_controller/recording_message"
     ANNOTATION_KEYS = ("recording_message",)
 
-    def __init__(self, tcp_ip="127.0.1.1", tcp_port=50020,
+    def __init__(self, tcp_ip="localhost", tcp_port=50020,
                  recording_message_port=RECORDING_MESSAGE_PORT,
                  get_gaze_coordinates=True, gaze_coordinates_port=GAZE_COORDINATES_PORT,
                  gaze_message_type="fixation", min_gaze_confidence=0.2,  # gaze_message_type="gaze.3d"
-                 annotation_keys=ANNOTATION_KEYS, annotations_port=ANNOTATIONS_PORT, mware=MWARE):
+                 annotation_keys=ANNOTATION_KEYS, annotations_port=ANNOTATIONS_PORT, mware=MWARE, **kwargs):
         # TODO (fabawi): update this to match changes and add support for gaze.3d as gaze_message_type
         super(MiddlewareCommunicator, self).__init__()
         self.tcp_ip = tcp_ip
         self.tcp_port = tcp_port
+        self.get_gaze_coordinates = get_gaze_coordinates
         self.gaze_message_type = gaze_message_type
         self.min_gaze_confidence = min_gaze_confidence
         self.MWARE = mware
@@ -183,6 +185,11 @@ class PupilCore(MiddlewareCommunicator):
             self.pupil_remote, _ = setup_pupil_remote_connection(self.tcp_ip, self.tcp_port)
         else:
             self.pupil_remote = None
+        if recording_message_port:
+            self.activate_communication(self.acquire_recording_message, "listen")
+        else:
+            self.activate_communication(self.acquire_recording_message, "disable")
+            self.activate_communication(self.update_recording_message, "disable")
 
         if annotations_port or annotation_keys:
             _, self.pub_socket = setup_pupil_remote_connection(self.tcp_ip, self.tcp_port,
@@ -203,15 +210,19 @@ class PupilCore(MiddlewareCommunicator):
                 self.pupil_remote,
                 {"subject": "start_plugin", "name": "Annotation_Capture", "args": {}},
             )
-            self.activate_communication(getattr(self, "acquire_annotation_message"), "listen")
-            self.activate_communication(getattr(self, "write_annotation_message"), "publish")
+            self.activate_communication(getattr(self, "acquire_annotations"), "listen")
+        else:
+            self.activate_communication(self.acquire_annotations, "disable")
+            self.activate_communication(self.write_annotation, "disable")
 
         if get_gaze_coordinates and gaze_message_type:
             _, self.sub_socket_gaze = setup_pupil_remote_connection(self.tcp_ip, self.tcp_port,
                                                                     port_type="subscriber",
                                                                     message_type=self.gaze_message_type)
             if gaze_coordinates_port:
-                self.activate_communication(getattr(self, "read_gaze"), "publish")
+                self.activate_communication(self.read_gaze, "publish")
+        else:
+            self.activate_communication(self.read_gaze, "disable")
 
         self.build()
 
@@ -266,17 +277,18 @@ class PupilCore(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware", "PupilCore",
                                      "$recording_message_port", should_wait=False)
-    def acquire_recording_message(self, recording_message_port=RECORDING_MESSAGE_PORT, _mware=MWARE):
+    def acquire_recording_message(self, recording_message_port=RECORDING_MESSAGE_PORT, _mware=MWARE, **kwargs):
         return None,
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware", "PupilCore",
                                      "/pupil_core_controller/logs/recording_message", should_wait=False)
     def update_recording_message(self, _mware=MWARE, **kwargs):
+
         if kwargs.get("begin_calibration", False):
             self.start_calibration()
         if kwargs.get("end_calibration", False):
             self.end_calibration()
-        if kwargs.get("start_recording", False):
+        if kwargs.get("begin_recording", False):
             self.start_recording(session_name=kwargs.get("recording_name", ""))
         if kwargs.get("end_recording", False):
             self.end_recording()
@@ -318,37 +330,26 @@ class PupilCore(MiddlewareCommunicator):
                 print(gaze)
             else:
                 print(self.prev_gaze)
-        if hasattr(self, "pub_socket"):
-            session, = self.acquire_recording_message(recording_message_port=self.RECORDING_MESSAGE_PORT, _mware=self.MWARE)
-            if session is not None:
-                recording_annotation, = self.write_recording_message(**session, _mware=self.MWARE)
-                annotations.update(**recording_annotation.get("recording_message", {}))
+        # writing and publishing
+        session, = self.acquire_recording_message(recording_message_port=self.RECORDING_MESSAGE_PORT, _mware=self.MWARE)
 
-            anno_return, = self.acquire_annotations(annotations_port=self.ANNOTATIONS_PORT, _mware=self.MWARE)
-            transmitted_annotation = annotations.copy()
-            anno_return = anno_return or {}
-            anno_return.update(transmitted_annotation)
+        if session is not None:
+            recording_annotation, = self.update_recording_message(**session, _mware=self.MWARE)
+            annotations.update(**recording_annotation.get("recording_message", {}))
 
-            for annotation_key in self.annotation_keys:
-                anno_return.get(annotation_key, None)
-                if anno_return is not None:
-                    self.write_annotation(annotation_key, **anno_return)
+        anno_return, = self.acquire_annotations(annotations_port=self.ANNOTATIONS_PORT, _mware=self.MWARE)
+        transmitted_annotation = annotations.copy()
+        anno_return = anno_return or {}
+        anno_return.update(transmitted_annotation)
+
+        for annotation_key in self.ANNOTATION_KEYS:
+            anno_return.get(annotation_key, None)
+            if anno_return is not None:
+                self.write_annotation(annotation_key, _mware=self.MWARE, **anno_return)
         return True
 
     def runModule(self):
-        while True:
-            # TODO (fabawi): update this to match changes
-            if hasattr(self, "pub_socket"):
-                session, = self.acquire_recording_message()
-                time.sleep(0.1)
-                if session is not None:
-                    if session.get("begin_recording", False):
-                        self.start_recording(session_name=session.get("recording_name", ""))
-                    if session.get("begin_calibration", False):
-                        self.start_calibration()
-                        break
-            else:
-                break
+
         while True:
             try:
                 self.updateModule()
@@ -369,16 +370,78 @@ class PupilCore(MiddlewareCommunicator):
             self.pub_socket.close()
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--annotate", action="store_true", default=False,
-                        help="Transmit annotation to pupil capture application. This automatically disable pupil reader")
-    args = parser.parse_args()
+class PupilCoreCommandLine(MiddlewareCommunicator):
+    MWARE = PUPIL_CORE_DEFAULT_COMMUNICATOR
+    RECORDING_MESSAGE_PORT = "/pupil_core_controller/recording_message"
 
-    if args.annotate:
-        pupil = PupilCore(gaze_message_type="")
-        pupil.runModule()
+    def __init__(self, recording_message_port=RECORDING_MESSAGE_PORT, mware=MWARE, **kwargs):
+        super(MiddlewareCommunicator, self).__init__()
+        self.MWARE = mware
+        self.RECORDING_MESSAGE_PORT = recording_message_port
+
+        self.activate_communication(getattr(self, "transmit_recording_message"), "publish")
+
+        self.build()
+
+    def build(self):
+        return
+
+    def runModule(self):
+        while True:
+            command = input("Insert command (R: record; r: stop rec.; C: calibrate; c: stop cal.): ")
+            if command == "R":  # begin recording
+                self.transmit_recording_message(message={"begin_recording": True})
+            elif command == "r":  # end recording
+                self.transmit_recording_message(message={"end_recording": True})
+            elif command == "C":  # begin calibration
+                self.transmit_recording_message(message={"begin_calibration": True})
+            elif command == "c":  # end calibration
+                self.transmit_recording_message(message={"end_calibration": True})
+
+    @MiddlewareCommunicator.register("NativeObject", "$_mware", "PupilCoreCommandLine",
+                                     "$recording_message_port", should_wait=False)
+    def transmit_recording_message(self, message, recording_message_port=RECORDING_MESSAGE_PORT, _mware=MWARE):
+        return message,
+
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--set_recording_message", action="store_true", default=False,
+                        help="Type recording commands into terminal and ignores all other commands skipping "
+                             "initialization of interface. This should be run in parallel with interface ")
+
+    parser.add_argument("--tcp_ip", type=str, default="localhost", help="The Pupil Core TCP IP")
+    parser.add_argument("--tcp_port", type=int, default=50020, help="The Pupil Core TCP connection port")
+    parser.add_argument("--recording_message_port", type=str, default="",
+                        help="The port (topic) name used for receiving recording command messages")
+    parser.add_argument("--get_gaze_coordinates", action="store_true", help="Get the gaze coordinates from the Pupil")
+    parser.add_argument("--gaze_coordinates_port", type=str, default="",
+                        help="The port (topic) name used for transmitting the acquired gaze coordinates")
+    parser.add_argument("--gaze_message_type", type=str, default="fixation", choices=("fixation", "gaze.3d"),
+                        help="The gaze message name to acquire directly from the Pupil")
+    parser.add_argument("--min_gaze_confidence", type=float, default=0.2,
+                        help="Minimum gaze confidence to accept before publishing coordinates. Max is 1, min is 0")
+    parser.add_argument("--annotations_port", type=str, default="",
+                        help="The port (topic) name used for receiving the annotations which are then transmitted to the Pupil")
+    parser.add_argument('--annotation_keys', nargs='*', default=('recording_message'),
+                        help='List of key names which should be passed to the Pupil from the ones published to the '
+                             'annotations port. Adding \'recording_message\' to the list transmits the keys '
+                             'passed to the recording port as well.')
+    parser.add_argument("--mware", type=str, default=PUPIL_CORE_DEFAULT_COMMUNICATOR,
+                        help="The middleware used for communication. "
+                             "This can be overriden by providing either of the following environment variables "
+                             "{WRAPYFI_DEFAULT_COMMUNICATOR, WRAPYFI_DEFAULT_MWARE, "
+                             "WAVESHARE_IMU_DEFAULT_COMMUNICATOR, WAVESHARE_IMU_DEFAULT_MWARE}. "
+                             "Defaults to the Wrapyfi default communicator",
+                        choices=MiddlewareCommunicator.get_communicators())
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    if args.set_recording_message:
+        pupil = PupilCoreCommandLine(**vars(args))
     else:
-        # TODO (fabawi): update this to match changes
-        pupil = PupilCore(pose_annotation=())
-        pupil.runModule()
+        pupil = PupilCore(**vars(args))
+    pupil.runModule()
