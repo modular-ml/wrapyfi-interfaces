@@ -3,7 +3,10 @@ import sys
 import time
 import socket
 import argparse
+import io
+import PIL
 
+import cv2
 import numpy as np
 import zmq
 import msgpack as serializer
@@ -149,26 +152,52 @@ class PupilCore(MiddlewareCommunicator):
     ANNOTATIONS_PORT = "/pupil_core_controller/annotations"
     GAZE_COORDINATES_PORT = "/control_interface/gaze_coordinates"
     RECORDING_MESSAGE_PORT = "/pupil_core_controller/recording_message"
+    CAM_WORLD_PORT = "/pupil_core_controller/world_video_feed"
+    CAM_WORLD_FRAME_WIDTH = 1280
+    CAM_WORLD_FRAME_HEIGHT = 720
+    CAM_LEFT_PORT = "/pupil_core_controller/left_video_feed"
+    CAM_LEFT_FRAME_WIDTH = 192
+    CAM_LEFT_FRAME_HEIGHT = 192
+    CAM_RIGHT_PORT = "/pupil_core_controller/right_video_feed"
+    CAM_RIGHT_FRAME_WIDTH = 192
+    CAM_RIGHT_FRAME_HEIGHT = 192
     ANNOTATION_KEYS = ("recording_message",)
 
-    def __init__(self, tcp_ip="localhost", tcp_port=50020,
+    def __init__(self, tcp_ip="localhost", tcp_port=50020, headless=False,
                  recording_message_port=RECORDING_MESSAGE_PORT,
+                 get_cam_world_feed=True, cam_world_port=CAM_WORLD_PORT,
+                 cam_world_height=CAM_WORLD_FRAME_HEIGHT, cam_world_width=CAM_WORLD_FRAME_WIDTH,
+                 get_cam_right_feed=False, cam_right_port=CAM_RIGHT_PORT,
+                 cam_right_height=CAM_RIGHT_FRAME_HEIGHT, cam_right_width=CAM_RIGHT_FRAME_WIDTH,
+                 get_cam_left_feed=False, cam_left_port=CAM_LEFT_PORT,
+                 cam_left_height=CAM_LEFT_FRAME_HEIGHT, cam_left_width=CAM_LEFT_FRAME_WIDTH,
                  get_gaze_coordinates=True, gaze_coordinates_port=GAZE_COORDINATES_PORT,
                  gaze_message_type="fixation", min_gaze_confidence=0.2,  # gaze_message_type="gaze.3d"
                  annotation_keys=ANNOTATION_KEYS, annotations_port=ANNOTATIONS_PORT, mware=MWARE, **kwargs):
-        # TODO (fabawi): update this to match changes and add support for gaze.3d as gaze_message_type
+
         super(MiddlewareCommunicator, self).__init__()
-        self.tcp_ip = tcp_ip
-        self.tcp_port = tcp_port
-        self.get_gaze_coordinates = get_gaze_coordinates
-        self.gaze_message_type = gaze_message_type
-        self.min_gaze_confidence = min_gaze_confidence
+
         self.MWARE = mware
         self.ANNOTATIONS_PORT = annotations_port
         self.GAZE_COORDINATES_PORT = gaze_coordinates_port
         self.RECORDING_MESSAGE_PORT = recording_message_port
         self.ANNOTATION_KEYS = annotation_keys
+        self.CAM_WORLD_PORT = cam_world_port
+        self.CAM_RIGHT_PORT = cam_right_port
+        self.CAM_LEFT_PORT = cam_left_port
+        self.CAM_WORLD_FRAME_WIDTH = cam_world_width
+        self.CAM_WORLD_FRAME_HEIGHT = cam_world_height
+        self.CAM_RIGHT_FRAME_WIDTH = cam_right_width
+        self.CAM_RIGHT_FRAME_HEIGHT = cam_right_height
+        self.CAM_LEFT_FRAME_WIDTH = cam_left_width
+        self.CAM_LEFT_FRAME_HEIGHT = cam_left_height
 
+        self.tcp_ip = tcp_ip
+        self.tcp_port = tcp_port
+        self.headless = headless
+        self.get_gaze_coordinates = get_gaze_coordinates
+        self.gaze_message_type = gaze_message_type
+        self.min_gaze_confidence = min_gaze_confidence
 
         self.pupil_remote = None
 
@@ -224,10 +253,115 @@ class PupilCore(MiddlewareCommunicator):
         else:
             self.activate_communication(self.read_gaze, "disable")
 
+        if get_cam_world_feed:
+            _, self.sub_socket_world_img = setup_pupil_remote_connection(self.tcp_ip, self.tcp_port,
+                                                                         port_type="subscriber",
+                                                                         message_type="frame.world")
+            if cam_world_port:
+                self.activate_communication(self.read_world_image, "publish")
+        else:
+            self.activate_communication(self.read_world_image, "disable")
+
+        if get_cam_left_feed:
+            _, self.sub_socket_right_img = setup_pupil_remote_connection(self.tcp_ip, self.tcp_port,
+                                                                         port_type="subscriber",
+                                                                         message_type="frame.eye.1")
+            if cam_left_port:
+                self.activate_communication(self.read_left_image, "publish")
+        else:
+            self.activate_communication(self.read_left_image, "disable")
+
+        if get_cam_right_feed:
+            _, self.sub_socket_left_img = setup_pupil_remote_connection(self.tcp_ip, self.tcp_port,
+                                                                        port_type="subscriber",
+                                                                        message_type="frame.eye.0")
+            if cam_right_port:
+                self.activate_communication(self.read_right_image, "publish")
+        else:
+            self.activate_communication(self.read_right_image, "disable")
+
         self.build()
 
     def build(self):
         return
+
+    @MiddlewareCommunicator.register("Image", "$_mware", "PupilCore", "$cam_world_port",
+                                     width="$img_width", height="$img_height", rgb="$_rgb")
+    def read_world_image(self, cam_world_port, img_width=CAM_WORLD_FRAME_WIDTH, img_height=CAM_WORLD_FRAME_HEIGHT,
+                         jpg=True, _rgb=True, _mware=MWARE):
+        """
+        Read images from the world camera of the Pupil Core.
+
+        :param cam_world_port: str: Port to receive images from the world camera
+        :param img_width: int: Width of the image
+        :param img_height: int: Height of the image
+        :param _rgb: bool: Whether the image is RGB or not
+        :return: Images from the Pupil
+        """
+        try:
+            _, _, payload = self.sub_socket_world_img.recv_multipart()
+            if jpg:
+                img_stream = io.BytesIO(payload)
+                img = np.array(PIL.Image.open(img_stream))
+
+            elif _rgb:
+                img = np.fromstring(payload, dtype=np.uint8).reshape(img_height, img_width, 3)
+            else:
+                img = np.fromstring(payload, dtype=np.uint8).reshape(img_height, img_width)
+            return img,
+        except:
+            if _rgb:
+                return np.zeros((img_height, img_width, 3), dtype="uint8"),
+            else:
+                return np.zeros((img_height, img_width), dtype="uint8"),
+
+    @MiddlewareCommunicator.register("Image", "$_mware", "PupilCore", "$cam_right_port",
+                                     width="$img_width", height="$img_height", rgb=False)
+    def read_right_image(self, cam_right_port, img_width=CAM_RIGHT_FRAME_WIDTH, img_height=CAM_WORLD_FRAME_HEIGHT,
+                         jpg=True, _mware=MWARE):
+        """
+        Read images from the right eye camera of the Pupil Core.
+
+        :param cam_right_port: str: Port to receive images from the right eye camera
+        :param img_width: int: Width of the image
+        :param img_height: int: Height of the image
+        :param _rgb: bool: Whether the image is RGB or not
+        :return: Images from the Pupil
+        """
+        try:
+            _, _, payload = self.sub_socket_right_img.recv_multipart()
+            if jpg:
+                img_stream = io.BytesIO(payload)
+                img = np.array(PIL.Image.open(img_stream))
+            else:
+                img = np.fromstring(payload, dtype=np.uint8).reshape(img_height, img_width)
+            return img,
+        except:
+            return np.zeros((img_height, img_width), dtype="uint8"),
+
+    @MiddlewareCommunicator.register("Image", "$_mware", "PupilCore", "$cam_left_port",
+                                     width="$img_width", height="$img_height", rgb=False)
+    def read_left_image(self, cam_left_port, img_width=CAM_LEFT_FRAME_WIDTH, img_height=CAM_LEFT_FRAME_HEIGHT,
+                        jpg=True, _mware=MWARE):
+        """
+        Read images from the left eye camera of the Pupil Core.
+
+        :param cam_left_port: str: Port to receive images from the left eye camera
+        :param img_width: int: Width of the image
+        :param img_height: int: Height of the image
+        :param _rgb: bool: Whether the image is RGB or not
+        :return: Images from the Pupil
+        """
+        try:
+            _, _, payload = self.sub_socket_left_img.recv_multipart()
+            if jpg:
+                img_stream = io.BytesIO(payload)
+                img = np.array(PIL.Image.open(img_stream))
+            else:
+                img = np.fromstring(payload, dtype=np.uint8).reshape(img_height, img_width)
+            return img,
+        except:
+            return np.zeros((img_height, img_width), dtype="uint8"),
 
     @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "PupilCore", "/eye_tracker/Pupil/fixation",
                                      carrier="", should_wait=False)
@@ -237,14 +371,17 @@ class PupilCore(MiddlewareCommunicator):
             _, payload = self.sub_socket_gaze.recv_multipart()
             message = serializer.loads(payload)
 
-            gaze = message["norm_pos"]
-            confidence = message["confidence"]
-
-            # calculate yaw and pitch
-            yaw = np.rad2deg(np.arctan2((gaze[0] - 0.5) * 2, 1))
-            pitch = np.rad2deg(np.arctan2((gaze[1] - 0.5) * 2, 1))
-            # yaw = np.rad2deg(message[b"base_data"][0][b"theta"])
-            # pitch = np.rad2deg(message[b"base_data"][0][b"phi"])
+            if self.gaze_message_type == "fixation":
+                gaze = message["norm_pos"]
+                confidence = message["confidence"]
+                # calculate yaw and pitch
+                yaw = np.rad2deg(np.arctan2((gaze[0] - 0.5) * 2, 1))
+                pitch = np.rad2deg(np.arctan2((gaze[1] - 0.5) * 2, 1))
+            else:
+                gaze = message["base_data"]
+                confidence = message["confidence"]
+                yaw = np.rad2deg(gaze[0]["theta"])
+                pitch = np.rad2deg(gaze[0]["phi"])
 
             gaze_message = {
                 "gaze": gaze,
@@ -323,6 +460,28 @@ class PupilCore(MiddlewareCommunicator):
 
     def updateModule(self):
         annotations = {}
+        if hasattr(self, "sub_socket_world_img"):
+            world_cam, = self.read_world_image(cam_world_port=self.CAM_WORLD_PORT,
+                                               img_width=self.CAM_WORLD_FRAME_WIDTH,
+                                               img_height=self.CAM_WORLD_FRAME_HEIGHT, _mware=self.MWARE)
+            if not self.headless and world_cam is not None:
+                cv2.imshow("PupilWorldCam", world_cam)
+                cv2.waitKey(1)
+        if hasattr(self, "sub_socket_left_img"):
+            left_cam, = self.read_left_image(cam_left_port=self.CAM_LEFT_PORT,
+                                               img_width=self.CAM_LEFT_FRAME_WIDTH,
+                                               img_height=self.CAM_LEFT_FRAME_HEIGHT, _mware=self.MWARE)
+            if not self.headless and left_cam is not None:
+                cv2.imshow("PupilLeftCam", left_cam)
+                cv2.waitKey(1)
+        if hasattr(self, "sub_socket_left_img"):
+            right_cam, = self.read_left_image(cam_left_port=self.CAM_LEFT_PORT,
+                                               img_width=self.CAM_LEFT_FRAME_WIDTH,
+                                               img_height=self.CAM_LEFT_FRAME_HEIGHT, _mware=self.MWARE)
+            if not self.headless and right_cam is not None:
+                cv2.imshow("PupilRightCam", right_cam)
+                cv2.waitKey(1)
+
         if hasattr(self, "sub_socket_gaze"):
             gaze, = self.read_gaze()
             if gaze is not None:
@@ -346,6 +505,7 @@ class PupilCore(MiddlewareCommunicator):
             anno_return.get(annotation_key, None)
             if anno_return is not None:
                 self.write_annotation(annotation_key, _mware=self.MWARE, **anno_return)
+                annotations.clear()
         return True
 
     def runModule(self):
@@ -410,9 +570,21 @@ def parse_args():
     parser.add_argument("--set_recording_message", action="store_true", default=False,
                         help="Type recording commands into terminal and ignores all other commands skipping "
                              "initialization of interface. This should be run in parallel with interface ")
-
     parser.add_argument("--tcp_ip", type=str, default="localhost", help="The Pupil Core TCP IP")
     parser.add_argument("--tcp_port", type=int, default=50020, help="The Pupil Core TCP connection port")
+    parser.add_argument("--headless", action="store_true", help="Disable CV2 GUI")
+    parser.add_argument("--get_cam_world_feed", action="store_true",
+                        help="Get the camera feeds from the Pupil world camera")
+    parser.add_argument("--cam_world_port", type=str, default="",
+                        help="The port (topic) name used for publishing (republishing) Pupil world camera images")
+    parser.add_argument("--get_cam_left_feed", action="store_true",
+                        help="Get the camera feeds from the Pupil left eye camera")
+    parser.add_argument("--cam_left_port", type=str, default="",
+                        help="The port (topic) name used for publishing (republishing) Pupil left eye camera images")
+    parser.add_argument("--get_cam_right_feed", action="store_true",
+                        help="Get the camera feeds from the Pupil right eye camera")
+    parser.add_argument("--cam_right_port", type=str, default="",
+                        help="The port (topic) name used for publishing (republishing) Pupil right eye camera images")
     parser.add_argument("--recording_message_port", type=str, default="",
                         help="The port (topic) name used for receiving recording command messages")
     parser.add_argument("--get_gaze_coordinates", action="store_true", help="Get the gaze coordinates from the Pupil")

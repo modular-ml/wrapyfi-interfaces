@@ -94,6 +94,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                  mware=MWARE):
         """
         Initialize the ICub head controller, facial expression transmitter and camera viewer.
+
         :param simulation: bool: Whether to run the simulation or not
         :param headless: bool: Whether to run the headless mode or not
         :param get_cam_feed: bool: Whether to get (listen) the camera feed or not
@@ -283,6 +284,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      _mware=MWARE, **kwargs):
         """
         Acquire head coordinates for controlling the iCub.
+
         :param head_coordinates_port: str: Port to receive head coordinates
         :param cv2_key: int: Key pressed by the user
         :return: dict: Head orientation coordinates
@@ -338,6 +340,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                      _mware=MWARE, **kwargs):
         """
         Acquire eye coordinates for controlling the iCub.
+
         :param eye_coordinates_port: str: Port to receive eye coordinates
         :param cv2_key: int: Key pressed by the user
         :return: dict: Eye oreintation coordinates
@@ -386,6 +389,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                        _mware=MWARE, **kwargs):
         """
         Receive gaze plane (normalized x,y) coordinates for controlling the iCub.
+
         :param gaze_plane_coordinates_port: str: Port to receive gaze plane coordinates
         :return: dict: Gaze plane coordinates
         """
@@ -424,6 +428,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def reset_gaze(self, _mware=MWARE):
         """
         Reset the eyes and head to their original position.
+
         :param _mware: str: Middleware to use
         :return: dict: Gaze reset log for a given time step
         """
@@ -438,6 +443,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def update_head_gaze_speed(self, pitch=10.0, roll=10.0, yaw=20.0, head=0.8, _mware=MWARE, **kwargs):
         """
         Control the iCub head speed.
+
         :param pitch: float->pitch[deg/s]: Pitch speed
         :param roll: float->roll[deg/s]: Roll speed
         :param yaw: float->yaw[deg/s]: Yaw speed
@@ -466,6 +472,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def update_eye_gaze_speed(self, pitch=10.0, yaw=10.0, vergence=20.0, eye=0.5, _mware=MWARE, **kwargs):
         """
         Control the iCub eye speed.
+
         :param pitch: float->pitch[deg/s]: Pitch speed
         :param yaw: float->yaw[deg/s]: Yaw speed
         :param vergence: float->vergence[deg/s]: Speed of vergence shift between the eyes
@@ -495,6 +502,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         """
         Control the iCub head relative to previous coordinates following the roll,pitch,yaw convention (order=xyz)
         (initialized at 0 looking straight ahead).
+
         :param pitch: float->pitch[deg]: Pitch angle
         :param roll: float->roll[deg]: Roll angle
         :param yaw: float->yaw[deg]: Yaw angle
@@ -529,6 +537,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def control_eye_gaze(self, pitch=0.0, yaw=0.0, vergence=0.0, _mware=MWARE, **kwargs):
         """
         Control the iCub eyes relative to previous coordinates (initialized at 0 looking straight ahead).
+
         :param pitch: float->pitch[deg]: Pitch angle
         :param yaw: float->yaw[deg]: Yaw (version) angle
         :param vergence: float->yaw[deg]: Vergence angle between the eyes
@@ -559,6 +568,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def _control_head_eye_gaze(self, _mware=MWARE, **kwargs):
         """
         Issue the movement command
+
         :param _mware: str: Middleware to use
         :return: dict: Head orientation coordinates log for a given time step
         """
@@ -586,6 +596,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                               _mware=MWARE, **kwargs):
         """
         Gaze at specific point in a normalized plane in front of the iCub.
+
         :param x: float->x[-1,1]: x coordinate in the plane limited to the range of -1 (left) and 1 (right)
         :param y: float->y[-1,1]: y coordinate in the plane limited to the range of -1 (bottom) and 1 (top)
         :param limit_x: float->limit_x[0,1]: x coordinate limit in the plane
@@ -634,6 +645,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                    _mware=MWARE, **kwargs):
         """
         Acquire facial expressions from the iCub.
+
         :param facial_expressions_port: str: Port to acquire facial expressions from
         :param cv2_key: int: Key to press to set the facial expression
         :return: dict: Facial expressions log for a given time step
@@ -691,6 +703,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     def update_facial_expressions(self, expression, part=False, smoothing="mode", _mware=MWARE, **kwargs):
         """
         Control facial expressions of the iCub.
+
         :param expression: str: Expression to be controlled
         :param expression: str or tuple(str->part, str->emotion) or list[str] or list[tuple(str->part, str->emotion)]:
                             Expression/s abbreviation or matching lookup table entry.
@@ -748,6 +761,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                        img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, _rgb=True):
         """
         Receive images from the iCub.
+
         :param cam_world_port: str: Port to receive images from the world camera
         :param cam_left_port: str: Port to receive images from the left camera
         :param cam_right_port: str: Port to receive images from the right camera
