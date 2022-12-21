@@ -576,7 +576,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         # initialize a new tmp vector identical to encs
         self.init_pos = yarp.Vector(self._num_jnts, self._encs.data())
 
-        # head control
+        # head + eye control
         self.init_pos.set(0, self.init_pos_head.get(0))  # tilt/pitch
         self.init_pos.set(1, self.init_pos_head.get(1))  # swing/roll
         self.init_pos.set(2, self.init_pos_head.get(2))  # pan/yaw
