@@ -18,12 +18,12 @@ class WaveshareIMU(MiddlewareCommunicator):
     ORIENTATION_COORDINATES_PORT = "/control_interface/orientation_coordinates"
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
-                 oreintation_coordinates_port=ORIENTATION_COORDINATES_PORT,
+                 orientation_coordinates_port=ORIENTATION_COORDINATES_PORT,
                  mware=MWARE):
         super(MiddlewareCommunicator, self).__init__()
 
         self.MWARE = mware
-        self.ORIENTATION_COORDINATES_PORT = oreintation_coordinates_port
+        self.ORIENTATION_COORDINATES_PORT = orientation_coordinates_port
 
         self.ser_device = ser_device
         self.ser_rate = ser_rate
@@ -33,7 +33,7 @@ class WaveshareIMU(MiddlewareCommunicator):
             self.pico = serial.Serial(port=self.ser_device, baudrate=self.ser_rate, timeout=.1)
         else:
             self.pico = None
-        if oreintation_coordinates_port:
+        if orientation_coordinates_port:
             self.activate_communication(self.read_orientation, "publish")
 
         self.build()
