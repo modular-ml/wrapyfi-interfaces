@@ -524,7 +524,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self.init_pos_head.set(1, self.init_pos_head.get(1) + roll)  # swing/roll
         self.init_pos_head.set(2, self.init_pos_head.get(2) + yaw)  # pan/yaw
 
-        self._ipos.positionMove(self.init_pos_head.data())
+        # self._ipos.positionMove(self.init_pos_head.data())
         self._curr_head = list((pitch, roll, yaw))
 
         return {"topic": "logging_head_coordinates",
@@ -555,7 +555,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         self.init_pos_eyes.set(4, self.init_pos_eyes.get(4) + yaw)  # eye pan/version
         self.init_pos_eyes.set(5, self.init_pos_eyes.get(5) + vergence)  # the vergence between the eyes (to align, set to 0)
 
-        self._ipos.positionMove(self.init_pos_eyes.data())
+        # self._ipos.positionMove(self.init_pos_eyes.data())
         self._curr_eyes = list((pitch, yaw, vergence))
 
         return {"topic": "logging_eye_coordinates",
