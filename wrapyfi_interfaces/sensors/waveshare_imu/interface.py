@@ -39,7 +39,10 @@ class WaveshareIMU(MiddlewareCommunicator):
         self.pitch_offset = 0.0
         self.yaw_offset = 0.0
         self.roll_offset = 0.0
-        
+
+        self.prev_yaw = 0.0
+        self.best_yaw = 0.0
+
         self.counter = 0
         if ser_device and ser_rate:
             self.pico = serial.Serial(port=self.ser_device, baudrate=self.ser_rate, timeout=.1)
@@ -61,13 +64,20 @@ class WaveshareIMU(MiddlewareCommunicator):
     def read_orientation(self, orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, _mware=MWARE):
         try:
             sensor_data = self.pico.readline().decode("utf-8")
+            sensor_data = sensor_data.replace("nan", "\"nan\"")
             imu_data = json.loads(sensor_data)
-            imu_data["pitch"] = -imu_data["pitch"] if self.flip_pitch else imu_data["pitch"] - self.pitch_offset
-            imu_data["yaw"] = -imu_data["yaw"] if self.flip_pitch else imu_data["yaw"] - self.yaw_offset
-            imu_data["roll"] = -imu_data["roll"] if self.flip_pitch else imu_data["roll"] - self.roll_offset
+            imu_data["pitch"] = -imu_data["pitch"] - self.pitch_offset if self.flip_pitch else imu_data["pitch"] - self.pitch_offset
+            imu_data["yaw"] = -imu_data["yaw"] - self.yaw_offset if self.flip_pitch else imu_data["yaw"] - self.yaw_offset
+            imu_data["roll"] = -imu_data["roll"] - self.roll_offset if self.flip_pitch else imu_data["roll"] - self.roll_offset
             imu_data.update(topic=orientation_coordinates_port.split("/")[-1],
                             world_index=self.counter,
                             timestamp=time.time())
+            print("yaw differencing", imu_data["yaw"] - self.prev_yaw)
+            if abs(imu_data["yaw"] - self.prev_yaw) > 0.9:
+                self.best_yaw = imu_data["yaw"]
+
+            self.prev_yaw = imu_data["yaw"]
+            imu_data["yaw"] = self.best_yaw
             self.counter += 1
         except:
             imu_data = None
