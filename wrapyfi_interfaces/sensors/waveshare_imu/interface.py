@@ -3,13 +3,15 @@ import time
 import argparse
 import json
 import functools
+from collections import deque
 
 import serial
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
-
+from wrapyfi_interfaces.utils.filters import highpass_filter
 
 WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_COMMUNICATOR", DEFAULT_COMMUNICATOR)
 WAVESHARE_IMU_DEFAULT_COMMUNICATOR = os.environ.get("WAVESHARE_IMU_DEFAULT_MWARE", WAVESHARE_IMU_DEFAULT_COMMUNICATOR)
+
 
 
 class WaveshareIMU(MiddlewareCommunicator):
@@ -18,6 +20,10 @@ class WaveshareIMU(MiddlewareCommunicator):
     ORIENTATION_COORDINATES_PORT = "/control_interface/orientation_coordinates"
     BASELINE_MWARE = WAVESHARE_IMU_DEFAULT_COMMUNICATOR
     BASELINE_ORIENTATION_COORDINATES_PORT = "/control_interface/baseline_orientation_coordinates"
+    # constants
+    # YAW_QUEUE_SIZE = 10
+    # YAW_SMOOTHING_WINDOW = 2
+    YAW_DIFFERENCE_LOWER_THRESHOLD = 0.9
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
                  orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, flip_pitch=False, flip_yaw=False, flip_roll=False, mware=MWARE,
@@ -40,8 +46,10 @@ class WaveshareIMU(MiddlewareCommunicator):
         self.yaw_offset = 0.0
         self.roll_offset = 0.0
 
+        # yaw filtering
+        # self.yaw_queue = deque(maxlen=self.YAW_QUEUE_SIZE)
         self.prev_yaw = 0.0
-        self.best_yaw = 0.0
+        self.last_yaw = 0.0
 
         self.counter = 0
         if ser_device and ser_rate:
@@ -61,7 +69,7 @@ class WaveshareIMU(MiddlewareCommunicator):
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware", "WaveshareIMU",
                                      "$orientation_coordinates_port", should_wait=False)
-    def read_orientation(self, orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, _mware=MWARE):
+    def read_orientation(self, orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, yaw_smoothing="threshold", _mware=MWARE):
         try:
             sensor_data = self.pico.readline().decode("utf-8")
             sensor_data = sensor_data.replace("nan", "\"nan\"")
@@ -72,12 +80,18 @@ class WaveshareIMU(MiddlewareCommunicator):
             imu_data.update(topic=orientation_coordinates_port.split("/")[-1],
                             world_index=self.counter,
                             timestamp=time.time())
-            print("yaw differencing", imu_data["yaw"] - self.prev_yaw)
-            if abs(imu_data["yaw"] - self.prev_yaw) > 0.9:
-                self.best_yaw = imu_data["yaw"]
+            # print("yaw differencing", imu_data["yaw"] - self.prev_yaw)
+            if yaw_smoothing == "threshold":
+                if abs(imu_data["yaw"] - self.prev_yaw) > self.YAW_DIFFERENCE_LOWER_THRESHOLD:
+                    self.last_yaw = imu_data["yaw"]
 
-            self.prev_yaw = imu_data["yaw"]
-            imu_data["yaw"] = self.best_yaw
+                self.prev_yaw = imu_data["yaw"]
+                imu_data["yaw"] = self.last_yaw
+            # if yaw_smoothing == "highpass":
+            #     self.yaw_queue.append(imu_data["yaw"])
+            #     imu_data["yaw"] = highpass_filter(list(self.yaw_queue),
+            #                                       lower_bound=self.YAW_DIFFERENCE_LOWER_THRESHOLD,
+            #                                       window_length=self.YAW_SMOOTHING_WINDOW)
             self.counter += 1
         except:
             imu_data = None

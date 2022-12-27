@@ -10,7 +10,7 @@ def mode_smoothing_filter(time_series, default, alpha=0.22, beta=0.1, window_len
     return mode.mode[0] if mode.count >= min_count else default
 
 
-def highpass_filter(time_series, lower_bound, alpha=0.22, beta=0.1, window_length=6):
+def highpass_filter(time_series, lower_bound, alpha=0.22, beta=1, window_length=2):
     filtered_time_series = []
     for i in range(len(time_series)):
         if i < window_length:
@@ -18,11 +18,11 @@ def highpass_filter(time_series, lower_bound, alpha=0.22, beta=0.1, window_lengt
         else:
             difference = time_series[i] - time_series[i-window_length]
             if difference > lower_bound:
-                filtered_value = (1 - alpha) * filtered_time_series[-1] + alpha * difference
+                filtered_value = (1 - alpha) * filtered_time_series[-1] + alpha * (time_series[i] - time_series[i-window_length])
             else:
-                filtered_value = (1 - beta) * filtered_time_series[-1] + beta * difference
+                filtered_value = (1 - beta) * filtered_time_series[-1]
             filtered_time_series.append(filtered_value)
-    return filtered_time_series
+    return filtered_time_series[-1]
 
 #
 # # Code from: https://github.com/niru-5/imusensor/blob/master/imusensor/filters/kalman.py
