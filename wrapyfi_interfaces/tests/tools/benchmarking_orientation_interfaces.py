@@ -10,17 +10,17 @@ import pandas as pd
 from wrapyfi.connect.wrapper import MiddlewareCommunicator
 
 
-SHOULD_WAIT = False
+SHOULD_WAIT = True
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--mwares", type=str, default=["zeromq", "zeromq"],  #["ros2"]
+parser.add_argument("--mwares", type=str, default=["ros2", "ros2"],
                     choices=MiddlewareCommunicator.get_communicators(), nargs="+",
                     help="The middlewares to use for reception of IMU and Model data")
 parser.add_argument("--ports", type=str,
                     default=["/control_interface/orientation_waveshareimu",
                              "/control_interface/orientation_sixdrepnet"], nargs="+",
                     help="The ports to use for reception of IMU and Model data")
-parser.add_argument("--trials", type=int, default=2000, help="Number of trials to run per middleware")
+parser.add_argument("--trials", type=int, default=300, help="Number of trials to run per middleware")
 parser.add_argument("--skip_trials", type=int, default=0, help="Number of trials to skip before logging "
                                                                "to csv to avoid warmup time logging")
 args = parser.parse_args()
