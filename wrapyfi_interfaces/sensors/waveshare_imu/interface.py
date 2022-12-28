@@ -24,10 +24,13 @@ class WaveshareIMU(MiddlewareCommunicator):
     # YAW_QUEUE_SIZE = 10
     # YAW_SMOOTHING_WINDOW = 2
     YAW_DIFFERENCE_LOWER_THRESHOLD = 0.15
+    CALIBRATION_REPEAT = 100
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
-                 orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, flip_pitch=False, flip_yaw=False, flip_roll=False, mware=MWARE,
-                 baseline_orientation_coordinates_port=BASELINE_ORIENTATION_COORDINATES_PORT, baseline_mware=BASELINE_MWARE):
+                 flip_pitch=False, flip_yaw=False, flip_roll=False,
+                 orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, mware=MWARE,
+                 baseline_orientation_coordinates_port=BASELINE_ORIENTATION_COORDINATES_PORT,
+                 baseline_mware=BASELINE_MWARE):
         super(MiddlewareCommunicator, self).__init__()
 
         self.MWARE = mware
@@ -64,7 +67,7 @@ class WaveshareIMU(MiddlewareCommunicator):
         self.build()
 
     def build(self):
-        WaveshareIMU.read_orientation.__defaults__ = (self.ORIENTATION_COORDINATES_PORT, self.MWARE)
+        WaveshareIMU.read_orientation.__defaults__ = (self.ORIENTATION_COORDINATES_PORT, "threshold", self.MWARE)
         WaveshareIMU.read_baseline_orientation.__defaults__ = (self.BASELINE_ORIENTATION_COORDINATES_PORT, self.BASELINE_MWARE)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware", "WaveshareIMU",
@@ -79,6 +82,8 @@ class WaveshareIMU(MiddlewareCommunicator):
             imu_data["roll"] = -imu_data["roll"] - self.roll_offset if self.flip_pitch else imu_data["roll"] - self.roll_offset
             imu_data.update(topic=orientation_coordinates_port.split("/")[-1],
                             world_index=self.counter,
+                            order="xyz",
+                            quaternion=False,
                             timestamp=time.time())
             # print("yaw differencing", imu_data["yaw"] - self.prev_yaw)
             if yaw_smoothing == "threshold":
@@ -108,7 +113,7 @@ class WaveshareIMU(MiddlewareCommunicator):
 
     def calculate_baseline_offset(self):
         pitch_offsets, roll_offsets, yaw_offsets = [], [], []
-        for _ in range (0, 300):
+        for _ in range(0, self.CALIBRATION_REPEAT):
             imu_data, = self.read_orientation(orientation_coordinates_port=self.ORIENTATION_COORDINATES_PORT, _mware=self.MWARE)
             if imu_data is not None:
                 baseline_data, = self.read_baseline_orientation(orientation_coordinates_port=self.BASELINE_ORIENTATION_COORDINATES_PORT, _mware=self.BASELINE_MWARE)

@@ -274,7 +274,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
         ICub._control_head_eye_gaze.__defaults__ = (self.MWARE,)
         ICub.control_gaze_at_plane.__defaults__ = (0, 0, 0.3, 0.3, True, True, self.MWARE)
         ICub.acquire_facial_expressions.__defaults__ = (self.FACIAL_EXPRESSIONS_PORT, None, self.MWARE)
-        ICub.update_facial_expressions.__defaults__ = (False, None, self.MWARE)
+        ICub.update_facial_expressions.__defaults__ = (None, False, "mode", self.MWARE)
         ICub.receive_images.__defaults__ = (self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT, True)
 
     @MiddlewareCommunicator.register("NativeObject", "$_mware",
