@@ -19,6 +19,14 @@
 #include "lps22hb.h"
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include <time.h>
+#include <stdio.h>
+#include <pico/stdlib.h>
+
+clock_t clock()
+{
+    return (clock_t) time_us_64() / 10000;
+}
 
 int main(void)
 {
@@ -46,7 +54,7 @@ int main(void)
 	}
 	while(1){
 		LPS22HB_START_ONESHOT();
-        /*
+        
         if((I2C_readByte(LPS_STATUS)&0x01)==0x01)   //a new pressure data is generated
         {
             u8Buf[0]=I2C_readByte(LPS_PRESS_OUT_XL);
@@ -60,20 +68,24 @@ int main(void)
             u8Buf[1]=I2C_readByte(LPS_TEMP_OUT_H);
             TEMP_DATA=(float)((u8Buf[1]<<8)+u8Buf[0])/100.0f;
         }
-        */
+        
 	imuDataGet( &stAngles, &stGyroRawData, &stAccelRawData, &stMagnRawData);
+	clock_t origTime = clock();
+	
 	printf("\r\n {");
 	printf("\"roll\":%.2f, \"pitch\":%.2f, \"yaw\":%.2f",stAngles.fRoll, stAngles.fPitch, stAngles.fYaw);
-	//printf(", ");
-	//printf("\"pressure\":%6.2f, \"temperature\":%6.2f, ", PRESS_DATA, TEMP_DATA); //in hPa and degrees Celsius respectively
-	//printf(", ");
-	//printf("\"accel_x\":%d, \"accel_y\":%d, \"accel_z\":%d, ",stAccelRawData.s16X, stAccelRawData.s16Y, stAccelRawData.s16Z);
-	//printf(", ");
-	//printf("\"gyro_x\":%d, \"gyro_y\":%d, \"gyro_z\":%d, ",stGyroRawData.s16X, stGyroRawData.s16Y, stGyroRawData.s16Z);
-	//printf(", ");
-	//printf("\"magno_x\":%d, \"magno_y\":%d, \"magno_z\":%d, ",stMagnRawData.s16X, stMagnRawData.s16Y, stMagnRawData.s16Z);
+	printf(", ");
+	printf("\"pressure\":%6.2f, \"temperature\":%6.2f", PRESS_DATA, TEMP_DATA); //in hPa and degrees Celsius respectively
+	printf(", ");
+	printf("\"accel_x\":%d, \"accel_y\":%d, \"accel_z\":%d",stAccelRawData.s16X, stAccelRawData.s16Y, stAccelRawData.s16Z);
+	printf(", ");
+	printf("\"gyro_x\":%d, \"gyro_y\":%d, \"gyro_z\":%d",stGyroRawData.s16X, stGyroRawData.s16Y, stGyroRawData.s16Z);
+	printf(", ");
+	printf("\"magno_x\":%d, \"magno_y\":%d, \"magno_z\":%d",stMagnRawData.s16X, stMagnRawData.s16Y, stMagnRawData.s16Z);
+	printf(", ");
+	printf("\"orig_timestamp\":%.8f", (double)(origTime));
 	printf("}");
-	sleep_ms(100);
+	sleep_ms(1);
 	}
 		return 0;
 }
