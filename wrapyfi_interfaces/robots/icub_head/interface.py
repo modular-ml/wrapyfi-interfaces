@@ -819,7 +819,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                                    yaw=move_robot_head.get("yaw", 0.0), _mware=self.MWARE)
 
         # move robot eyes
-        move_robot_eyes, = self.acquire_eye_coordinates(head_coordinates_port=self.EYE_COORDINATES_PORT,
+        move_robot_eyes, = self.acquire_eye_coordinates(eye_coordinates_port=self.EYE_COORDINATES_PORT,
                                                              cv2_key=k, _mware=self.MWARE)
         if move_robot_eyes is not None and isinstance(move_robot_eyes, dict):
             robot_eye_speed = move_robot_eyes.get("speed", False)
