@@ -23,7 +23,7 @@ class WaveshareIMU(MiddlewareCommunicator):
     # constants
     # YAW_QUEUE_SIZE = 10
     # YAW_SMOOTHING_WINDOW = 2
-    YAW_DIFFERENCE_LOWER_THRESHOLD = 0.15
+    YAW_DIFFERENCE_LOWER_THRESHOLD = 0.155
     CALIBRATION_REPEAT = 100
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
