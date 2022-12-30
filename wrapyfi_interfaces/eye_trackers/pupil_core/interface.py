@@ -363,9 +363,9 @@ class PupilCore(MiddlewareCommunicator):
         except:
             return np.zeros((img_height, img_width), dtype="uint8"),
 
-    @MiddlewareCommunicator.register("NativeObject", PUPIL_CORE_DEFAULT_COMMUNICATOR, "PupilCore", "/eye_tracker/Pupil/fixation",
+    @MiddlewareCommunicator.register("NativeObject", "$_mware", "PupilCore", "$gaze_coordinates_port",
                                      carrier="", should_wait=False)
-    def read_gaze(self):
+    def read_gaze(self, gaze_coordinates_port=GAZE_COORDINATES_PORT, _mware=MWARE):
         confidence = None
         try:
             _, payload = self.sub_socket_gaze.recv_multipart()
@@ -384,6 +384,7 @@ class PupilCore(MiddlewareCommunicator):
                 pitch = np.rad2deg(gaze[0]["phi"])
 
             gaze_message = {
+                "topic": message["topic"],
                 "gaze": gaze,
                 "confidence": confidence,
                 "orig_timestamp": message["timestamp"],
@@ -486,7 +487,7 @@ class PupilCore(MiddlewareCommunicator):
                 cv2.waitKey(1)
 
         if hasattr(self, "sub_socket_gaze"):
-            gaze, = self.read_gaze()
+            gaze, = self.read_gaze(gaze_coordinates_port=self.GAZE_COORDINATES_PORT, _mware=self.MWARE)
             if gaze is not None:
                 self.prev_gaze = gaze
                 print(gaze)
