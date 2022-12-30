@@ -386,9 +386,12 @@ class PupilCore(MiddlewareCommunicator):
             gaze_message = {
                 "gaze": gaze,
                 "confidence": confidence,
-                "timestamp": message["timestamp"],
+                "orig_timestamp": message["timestamp"],
+                "timestamp": time.time(),
                 "yaw": yaw,
-                "pitch": pitch
+                "pitch": pitch,
+                "order": "xyz",
+                "quaternion": False,
             }
         except:
             gaze_message = None
