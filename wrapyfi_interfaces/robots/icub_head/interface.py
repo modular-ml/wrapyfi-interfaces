@@ -241,6 +241,8 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
             if set_facial_expressions:
                 self.activate_communication(self.acquire_facial_expressions, "publish")
             else:
+                for _ in range(self.FACIAL_EXPRESSIONS_QUEUE_SIZE):
+                    self.update_facial_expressions("hap", part="all", smoothing="mode")
                 self.activate_communication(self.acquire_facial_expressions, "listen")
         if head_coordinates_port:
             if set_head_coordinates:
@@ -727,9 +729,9 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
 
         expressions_lookup = EMOTION_LOOKUP.get(transmitted_expression, transmitted_expression)
         if isinstance(expressions_lookup, str):
-            expressions_lookup = [(part if part else "all", expressions_lookup)]
+            expressions_lookup = [(part if part else "LIGHTS", expressions_lookup)]
 
-        if self.last_expression[0] == (part if part else "all") and self.last_expression[1] == transmitted_expression:
+        if self.last_expression[0] == (part if part else "LIGHTS") and self.last_expression[1] == transmitted_expression:
             expressions_lookup = []
 
         for (part_lookup, expression_lookup) in expressions_lookup:
@@ -740,13 +742,15 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self.client.expect(">>")
                 self.client.sendline(f"set mou {expression_lookup}")
                 self.client.expect(">>")
+                print(f"set leb/reb/mou {expression_lookup}")
             else:
                 self.client.sendline(f"set {part_lookup} {expression_lookup}")
                 self.client.expect(">>")
+                print(f"set {part_lookup} {expression_lookup}")
 
         self.last_expression[0] = part
         self.last_expression[1] = transmitted_expression
-
+        
         return {"topic": "logging_facial_expressions",
                 "timestamp": time.time(), 
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},
