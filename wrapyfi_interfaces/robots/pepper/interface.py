@@ -63,11 +63,14 @@ class Pepper(MiddlewareCommunicator):
     FACIAL_EXPRESSIONS_QUEUE_SIZE = 50
     FACIAL_EXPRESSION_SMOOTHING_WINDOW = 6
     LED_SERVICE = "/pepper/leds/set_rgb"
+    SPEECH_TEXT_PORT = "/control_interface/speech_text"
+    SPEAKER_SERVICE = "/pepper/speech/say"
 
     def __init__(self, headless=False, get_cam_feed=True,
                  img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT,
                  control_expressions=False,
                  set_facial_expressions=True, facial_expressions_port=FACIAL_EXPRESSIONS_PORT,
+                 control_speech=False, speech_text_port=SPEECH_TEXT_PORT,
                  mware=MWARE):
 
         self.__name__ = "Pepper"
@@ -92,13 +95,22 @@ class Pepper(MiddlewareCommunicator):
             # control emotional expressions
             self.last_expression = ["", ""]  # (emotion part on the robot's face , emotional expression category)
             self.expressions_queue = deque(maxlen=self.FACIAL_EXPRESSIONS_QUEUE_SIZE)
-            print("Waiting for Pepper services...")
+            print("Waiting for Pepper LED services...")
             rospy.wait_for_service(self.LED_SERVICE)
             self.srv_set_rgbled = rospy.ServiceProxy(self.LED_SERVICE, pepper_extra.srv.LEDsSetRGB)
             self.update_leds("neu")
             print("Pepper services found")
         else:
             self.activate_communication(self.update_facial_expressions, "disable")
+
+        if control_speech:
+            print("Waiting for Pepper speaker services...")
+            rospy.wait_for_service(self.SPEAKER_SERVICE)
+            self.srv_set_speakertext = rospy.ServiceProxy(self.SPEAKER_SERVICE, pepper_extra.srv.SpeechSay)
+            self.update_speaker("Hello, Im pepper")
+            print("Pepper speaker services found")
+        else:
+            self.activate_communication(self.update_speech_text, "disable")
 
         if get_cam_feed:
             # control the listening properties from within the app
@@ -108,9 +120,14 @@ class Pepper(MiddlewareCommunicator):
                 self.activate_communication(self.acquire_facial_expressions, "publish")
             else:
                 self.activate_communication(self.acquire_facial_expressions, "listen")
+        if speech_text_port:
+            self.activate_communication(self.receive_speech_text, "listen")
+
         self.build()
 
     def build(self):
+        Pepper.receive_speech_text.__defaults__ = (self.SPEECH_TEXT_PORT, self.MWARE)
+        Pepper.update_speech_text.__defaults__ = ("", self.MWARE)
         Pepper.acquire_facial_expressions.__defaults__ = (self.FACIAL_EXPRESSIONS_PORT, None, self.MWARE)
         Pepper.update_facial_expressions.__defaults__ = ("LIGHTS", None, self.MWARE)
         Pepper.receive_images.__defaults__ = (self.CAP_PROP_FRAME_WIDTH, self.CAP_PROP_FRAME_HEIGHT, True)
@@ -189,12 +206,36 @@ class Pepper(MiddlewareCommunicator):
         r, g, b = color if isinstance(color, tuple) else (0.0, 0.0, 0.0)
         self.srv_set_rgbled('AllLeds', color if isinstance(color, str) else '', r, g, b, 0.5, False)
 
+    @MiddlewareCommunicator.register("NativeObject", "$_mware", "Pepper", "$speech_text_port", should_wait=False)
+    def receive_speech_text(self, speech_text_port=SPEECH_TEXT_PORT, _mware=MWARE):
+        return None,
+
+    @MiddlewareCommunicator.register("NativeObject", "$_mware", "Pepper", "/pepper_controller/logs/speech_text", should_wait=False)
+    def update_speech_text(self, speech_text, _mware=MWARE):
+        if isinstance(speech_text, dict):
+            try:
+                speech_text = speech_text["speech_text"]
+            except KeyError:
+                speech_text = speech_text["text"]
+
+            self.update_speaker(speech_text)
+
+            return {"topic": "logging_speech_text",
+                    "timestamp": time.time(),
+                    "command": f"speech set to {speech_text}"},
+
+        else:
+            return None,
+
+    def update_speaker(self, speech):
+        print(f"Saying {speech}")
+        self.srv_set_speakertext(speech, False)
+
     @MiddlewareCommunicator.register("Image", "ros", "Pepper", "$cam_front_port", width="$img_width", height="$img_height", rgb="$_rgb")
     def receive_images(self, cam_front_port, img_width=CAP_PROP_FRAME_WIDTH, img_height=CAP_PROP_FRAME_HEIGHT, _rgb=True):
         return None,
 
     def updateModule(self):
-
         front_cam, = self.receive_images(**self.cam_props)
         if front_cam is None:
             front_cam = np.zeros((self.img_height, self.img_width, 1), dtype="uint8")
@@ -208,6 +249,10 @@ class Pepper(MiddlewareCommunicator):
         switch_emotion, = self.acquire_facial_expressions(facial_expressions_port=self.FACIAL_EXPRESSIONS_PORT, cv2_key=k, _mware=self.MWARE)
         if switch_emotion is not None and isinstance(switch_emotion, dict):
             self.update_facial_expressions(switch_emotion.get("emotion_category", None), part=switch_emotion.get("part", "LIGHTS"), _mware=self.MWARE)
+
+        speech_text, = self.receive_speech_text(speech_text_port=self.SPEECH_TEXT_PORT, mware=self.MWARE)
+        if speech_text is not None:
+            self.update_speech_text(speech_text, _mware=self.MWARE)
 
         return True
 
@@ -227,6 +272,9 @@ def parse_args():
     parser.add_argument("--facial_expressions_port", type=str, default="/control_interface/facial_expressions",
                         help="The port (topic) name used for receiving and transmitting facial expressions. "
                              "Setting the port name without --set_facial_expressions will only receive the facial expressions")
+    parser.add_argument("--control_speech", action="store_true", help="Control the Pepper speakerphone")
+    parser.add_argument("--speech_text_port", type=str, default="/control_interface/facial_expressions",
+                        help="The port (topic) name used for receiving text to be spoken by the Pepper")
     parser.add_argument("--mware", type=str, default=PEPPER_DEFAULT_COMMUNICATOR,
                         help="The middleware used for communication. "
                              "This can be overriden by providing either of the following environment variables "
