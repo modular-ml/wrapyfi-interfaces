@@ -1,5 +1,6 @@
 import time
 import argparse
+import logging
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 from wrapyfi_interfaces.utils.transformations import quaternion_to_euler, euler_to_quaternion
@@ -114,14 +115,14 @@ class OrientationInterface(MiddlewareCommunicator):
                                                    _should_wait=self.SHOULD_WAIT,
                                                    _mware=self.MWARE_IN)
         if orientation_in is not None:
-            print(f"Received emotion: {orientation_in}")
+            logging.info(f"Received orientation: {orientation_in}")
             time.sleep(self.getPeriod())
             orientation_out = self.transmit_orientation(**orientation_in,
                                                         orientation_coordinates_port=self.PORT_OUT,
                                                         _should_wait=self.SHOULD_WAIT,
                                                         _mware=self.MWARE_OUT)
             if orientation_out is not None:
-                print(f"Sent emotion: {orientation_out}")
+                logging.info(f"Sent orientation: {orientation_out}")
                 time.sleep(self.getPeriod())
 
     def runModule(self):

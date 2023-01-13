@@ -1,6 +1,7 @@
 import os
 import time
 import argparse
+import logging
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
@@ -96,14 +97,14 @@ class FacialExpressionsInterface(MiddlewareCommunicator):
                                            _should_wait=self.SHOULD_WAIT,
                                            _mware=self.MWARE_IN)
         if emotion_in is not None:
-            print(f"Received emotion: {emotion_in}")
+            logging.info(f"Received emotion: {emotion_in}")
             time.sleep(self.getPeriod())
             emotion_out = self.transmit_emotion(**emotion_in,
                                                 facial_expressions_port=self.PORT_OUT,
                                                 _should_wait=self.SHOULD_WAIT,
                                                 _mware=self.MWARE_OUT)
             if emotion_out is not None:
-                print(f"Sent emotion: {emotion_out}")
+                logging.info(f"Sent emotion: {emotion_out}")
                 time.sleep(self.getPeriod())
 
     def runModule(self):

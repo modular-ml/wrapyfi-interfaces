@@ -1,5 +1,6 @@
 import time
 import argparse
+import logging
 
 from wrapyfi.connect.wrapper import MiddlewareCommunicator, DEFAULT_COMMUNICATOR
 
@@ -111,14 +112,14 @@ class BoundingBoxInterface(MiddlewareCommunicator):
                                                _should_wait=self.SHOULD_WAIT,
                                                _mware=self.MWARE_IN)
         if bounding_box_in is not None:
-            print(f"Received bounding box: {bounding_box_in}")
+            logging.info(f"Received bounding box: {bounding_box_in}")
             time.sleep(self.getPeriod())
             bounding_box_out = self.transmit_bounding_box(**bounding_box_in,
                                                         bounding_box_port=self.PORT_OUT,
                                                         _should_wait=self.SHOULD_WAIT,
                                                         _mware=self.MWARE_OUT)
             if bounding_box_out is not None:
-                print(f"Sent bounding box: {bounding_box_out}")
+                logging.info(f"Sent bounding box: {bounding_box_out}")
                 time.sleep(self.getPeriod())
 
     def runModule(self):
