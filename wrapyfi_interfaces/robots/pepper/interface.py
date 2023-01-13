@@ -2,6 +2,7 @@ import os
 import time
 import argparse
 from collections import deque
+import logging
 
 import cv2
 import numpy as np
@@ -95,20 +96,20 @@ class Pepper(MiddlewareCommunicator):
             # control emotional expressions
             self.last_expression = ["", ""]  # (emotion part on the robot's face , emotional expression category)
             self.expressions_queue = deque(maxlen=self.FACIAL_EXPRESSIONS_QUEUE_SIZE)
-            print("Waiting for Pepper LED services...")
+            logging.info("Waiting for Pepper LED services...")
             rospy.wait_for_service(self.LED_SERVICE)
             self.srv_set_rgbled = rospy.ServiceProxy(self.LED_SERVICE, pepper_extra.srv.LEDsSetRGB)
             self.update_leds("neu")
-            print("Pepper services found")
+            logging.info("Pepper services found")
         else:
             self.activate_communication(self.update_facial_expressions, "disable")
 
         if control_speech:
-            print("Waiting for Pepper speaker services...")
+            logging.info("Waiting for Pepper speaker services...")
             rospy.wait_for_service(self.SPEAKER_SERVICE)
             self.srv_set_speakertext = rospy.ServiceProxy(self.SPEAKER_SERVICE, pepper_extra.srv.SpeechSay)
             self.update_speaker("Hello, Im pepper")
-            print("Pepper speaker services found")
+            logging.info("Pepper speaker services found")
         else:
             self.activate_communication(self.update_speech_text, "disable")
 
@@ -136,37 +137,37 @@ class Pepper(MiddlewareCommunicator):
     def acquire_facial_expressions(self, facial_expressions_port=FACIAL_EXPRESSIONS_PORT, cv2_key=None, _mware=MWARE):
         emotion = None
         if cv2_key is None:
-            print("Error: Controlling expressions in headless mode not yet supported")
+            logging.info("Error: Controlling expressions in headless mode not yet supported")
             return None,
         else:
             if cv2_key == 27:  # Esc key to exit
                 exit(0)
-            elif cv2_key == -1:  # normally -1 returned,so don't print it
+            elif cv2_key == -1:  # normally -1 returned,so don't logging.info it
                 pass
             elif cv2_key == 49:  # 1 key: sad emotion
                 emotion = "sad"
-                print("Keyed input emotion: sadness")
+                logging.info("Keyed input emotion: sadness")
             elif cv2_key == 50:  # 2 key: angry emotion
                 emotion = "ang"
-                print("Keyed input emotion: anger")
+                logging.info("Keyed input emotion: anger")
             elif cv2_key == 51:  # 3 key: happy emotion
                 emotion = "hap"
-                print("Keyed input emotion: happiness")
+                logging.info("Keyed input emotion: happiness")
             elif cv2_key == 52:  # 4 key: neutral emotion
                 emotion = "neu"
-                print("Keyed input emotion: neutrality")
+                logging.info("Keyed input emotion: neutrality")
             elif cv2_key == 53:  # 5 key: surprise emotion
                 emotion = "sur"
-                print("Keyed input emotion: surprise")
+                logging.info("Keyed input emotion: surprise")
             elif cv2_key == 54:  # 6 key: shy emotion
                 emotion = "shy"
-                print("Keyed input emotion: shyness")
+                logging.info("Keyed input emotion: shyness")
             elif cv2_key == 55:  # 7 key: evil emotion
                 emotion = "evi"
-                print("Keyed input emotion: evilness")
+                logging.info("Keyed input emotion: evilness")
             elif cv2_key == 56:  # 8 key: cunning emotion
                 emotion = "cun"
-                print("Keyed input emotion: cunningness")
+                logging.info("Keyed input emotion: cunningness")
             else:
                 return None,
             return {"topic": facial_expressions_port.split("/")[-1],
@@ -201,7 +202,7 @@ class Pepper(MiddlewareCommunicator):
                 "command": f"emotion set to {part} {expression} with smoothing={smoothing}"},
 
     def update_leds(self, emotion):
-        print(f"Showing emotion {emotion}")
+        logging.info(f"Showing emotion {emotion}")
         color = EMOTION_LEDS_LOOKUP[emotion]
         r, g, b = color if isinstance(color, tuple) else (0.0, 0.0, 0.0)
         self.srv_set_rgbled('AllLeds', color if isinstance(color, str) else '', r, g, b, 0.5, False)
@@ -228,7 +229,7 @@ class Pepper(MiddlewareCommunicator):
             return None,
 
     def update_speaker(self, speech):
-        print(f"Saying {speech}")
+        logging.info(f"Saying {speech}")
         self.srv_set_speakertext(speech, False)
 
     @MiddlewareCommunicator.register("Image", "ros", "Pepper", "$cam_front_port", width="$img_width", height="$img_height", rgb="$_rgb")

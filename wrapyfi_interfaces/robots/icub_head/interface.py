@@ -742,11 +742,11 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
                 self.client.expect(">>")
                 self.client.sendline(f"set mou {expression_lookup}")
                 self.client.expect(">>")
-                print(f"set leb/reb/mou {expression_lookup}")
+                logging.info(f"set leb/reb/mou {expression_lookup}")
             else:
                 self.client.sendline(f"set {part_lookup} {expression_lookup}")
                 self.client.expect(">>")
-                print(f"set {part_lookup} {expression_lookup}")
+                logging.info(f"set {part_lookup} {expression_lookup}")
 
         self.last_expression[0] = part
         self.last_expression[1] = transmitted_expression

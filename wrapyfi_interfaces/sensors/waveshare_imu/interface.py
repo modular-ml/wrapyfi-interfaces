@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 import argparse
@@ -63,6 +64,8 @@ class WaveshareIMU(MiddlewareCommunicator):
             self.activate_communication(self.read_orientation, "publish")
         if baseline_orientation_coordinates_port:
             self.activate_communication(self.read_baseline_orientation, "listen")
+        else:
+            self.activate_communication(self.read_baseline_orientation, "disable")
 
         self.build()
 
@@ -115,28 +118,44 @@ class WaveshareIMU(MiddlewareCommunicator):
         pitch_offsets, roll_offsets, yaw_offsets = [], [], []
         for _ in range(0, self.CALIBRATION_REPEAT):
             imu_data, = self.read_orientation(orientation_coordinates_port=self.ORIENTATION_COORDINATES_PORT, _mware=self.MWARE)
+            baseline_data, = self.read_baseline_orientation(orientation_coordinates_port=self.BASELINE_ORIENTATION_COORDINATES_PORT, _mware=self.BASELINE_MWARE)
+
             if imu_data is not None:
-                baseline_data, = self.read_baseline_orientation(orientation_coordinates_port=self.BASELINE_ORIENTATION_COORDINATES_PORT, _mware=self.BASELINE_MWARE)
                 if baseline_data is not None:
-                    print(baseline_data)
+                    logging.info(baseline_data)
                     pitch_offsets.append(imu_data["pitch"] - baseline_data["pitch"])
-                    print("PITCH OFFSETS", pitch_offsets)
+                    logging.info(f"PITCH OFFSETS:{pitch_offsets}")
                     roll_offsets.append(imu_data["roll"] - baseline_data["roll"])
                     yaw_offsets.append(imu_data["yaw"] - baseline_data["yaw"])
             time.sleep(self.getPeriod())
-        self.pitch_offset = sum(pitch_offsets) / len(pitch_offsets)
-        self.roll_offset = sum(roll_offsets) / len(roll_offsets)
-        self.yaw_offset = sum(yaw_offsets) / len(yaw_offsets)
+        try:
+            self.pitch_offset = sum(pitch_offsets) / len(pitch_offsets)
+        except ZeroDivisionError:
+            self.pitch_offset = 0
+            logging.warning("Pitch offset was not calculated correctly. Did you correctly set the baseline port?")
+        try:
+            self.roll_offset = sum(roll_offsets) / len(roll_offsets)
+        except ZeroDivisionError:
+            self.roll_offset = 0
+            logging.warning("Roll offset was not calculated correctly. Did you correctly set the baseline port?")
+        try:
+            self.yaw_offset = sum(yaw_offsets) / len(yaw_offsets)
+        except ZeroDivisionError:
+            self.yaw_offset = 0
+            logging.warning("Yaw offset was not calculated correctly. Did you correctly set the baseline port?")
 
         return None,
 
     def getPeriod(self):
-        return 0.001
+        return 0.02  # ~ 30-50 FPS
 
     def updateModule(self):
         imu_data, = self.read_orientation(orientation_coordinates_port=self.ORIENTATION_COORDINATES_PORT, _mware=self.MWARE)
+        # here we just want to drain the baseline reader if available
+        baseline_data, = self.read_baseline_orientation(orientation_coordinates_port=self.BASELINE_ORIENTATION_COORDINATES_PORT, _mware=self.BASELINE_MWARE)
+
         if imu_data is not None:
-            print(imu_data)
+            logging.info(imu_data)
         return True
     
     def runModule(self):

@@ -5,6 +5,7 @@ import socket
 import argparse
 import io
 import PIL
+import logging
 
 import cv2
 import numpy as np
@@ -17,14 +18,13 @@ PUPIL_CORE_DEFAULT_COMMUNICATOR = os.environ.get("PUPIL_CORE_DEFAULT_COMMUNICATO
 PUPIL_CORE_DEFAULT_COMMUNICATOR = os.environ.get("PUPIL_CORE_DEFAULT_MWARE", PUPIL_CORE_DEFAULT_COMMUNICATOR)
 
 
-
 def check_capture_exists(ip_address, port):
     """check pupil capture instance exists"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         if not sock.connect_ex((ip_address, port)):
-            print("Found Pupil Capture")
+            logging.info("Found Pupil Capture")
         else:
-            print("Cannot find Pupil Capture")
+            logging.warning("Cannot find Pupil Capture")
             sys.exit()
 
 
@@ -230,10 +230,10 @@ class PupilCore(MiddlewareCommunicator):
             pupil_time_actual = request_pupil_time(self.pupil_remote)
             local_time_actual = self.local_clock()
             pupil_time_calculated_locally = local_time_actual + self.stable_offset_mean
-            print(f"Pupil time actual: {pupil_time_actual}")
-            print(f"Local time actual: {local_time_actual}")
-            print(f"Stable offset: {self.stable_offset_mean}")
-            print(f"Pupil time (calculated locally): {pupil_time_calculated_locally}")
+            logging.info(f"Pupil time actual: {pupil_time_actual}")
+            logging.info(f"Local time actual: {local_time_actual}")
+            logging.info(f"Stable offset: {self.stable_offset_mean}")
+            logging.info(f"Pupil time (calculated locally): {pupil_time_calculated_locally}")
 
             notify(
                 self.pupil_remote,
@@ -325,7 +325,6 @@ class PupilCore(MiddlewareCommunicator):
         :param cam_right_port: str: Port to receive images from the right eye camera
         :param img_width: int: Width of the image
         :param img_height: int: Height of the image
-        :param _rgb: bool: Whether the image is RGB or not
         :return: Images from the Pupil
         """
         try:
@@ -349,7 +348,6 @@ class PupilCore(MiddlewareCommunicator):
         :param cam_left_port: str: Port to receive images from the left eye camera
         :param img_width: int: Width of the image
         :param img_height: int: Height of the image
-        :param _rgb: bool: Whether the image is RGB or not
         :return: Images from the Pupil
         """
         try:
@@ -439,25 +437,25 @@ class PupilCore(MiddlewareCommunicator):
                 "command": f"recording message: {kwargs}"},
 
     def start_calibration(self):
-        print("Start calibration")
+        logging.info("Start calibration")
         self.pupil_remote.send_string("C")
-        print(self.pupil_remote.recv_string())
+        logging.info(self.pupil_remote.recv_string())
 
     def end_calibration(self):
-        print("End calibration")
+        logging.info("End calibration")
         self.pupil_remote.send_string("c")
-        print(self.pupil_remote.recv_string())
+        logging.info(self.pupil_remote.recv_string())
 
     def start_recording(self, session_name=""):
-        print("Start recording")
+        logging.info("Start recording")
         cmd = f"R {session_name}" if session_name else "R"
         self.pupil_remote.send_string(cmd)
-        print(self.pupil_remote.recv_string())
+        logging.info(self.pupil_remote.recv_string())
 
     def end_recording(self):
-        print("End recording")
+        logging.info("End recording")
         self.pupil_remote.send_string("r")
-        print(self.pupil_remote.recv_string())
+        logging.info(self.pupil_remote.recv_string())
 
     def getPeriod(self):
         return 0.01
@@ -490,9 +488,9 @@ class PupilCore(MiddlewareCommunicator):
             gaze, = self.read_gaze(gaze_coordinates_port=self.GAZE_COORDINATES_PORT, _mware=self.MWARE)
             if gaze is not None:
                 self.prev_gaze = gaze
-                print(gaze)
+                logging.info(gaze)
             else:
-                print(self.prev_gaze)
+                logging.info(self.prev_gaze)
         # writing and publishing
         session, = self.acquire_recording_message(recording_message_port=self.RECORDING_MESSAGE_PORT, _mware=self.MWARE)
 
@@ -519,7 +517,7 @@ class PupilCore(MiddlewareCommunicator):
                 self.updateModule()
                 time.sleep(self.getPeriod())
             except Exception as e:
-                print(e)
+                logging.error(e)
                 break
         if hasattr(self, "pub_socket"):
             self.end_recording()
