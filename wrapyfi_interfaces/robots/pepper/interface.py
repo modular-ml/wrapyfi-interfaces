@@ -79,6 +79,7 @@ class Pepper(MiddlewareCommunicator):
 
         self.MWARE = mware
         self.FACIAL_EXPRESSIONS_PORT = facial_expressions_port
+        self.SPEECH_TEXT_PORT = speech_text_port
         self.headless = headless
         self.cam_props = {"cam_front_port": "/pepper/camera/front/camera/image_raw"}
 
@@ -251,7 +252,7 @@ class Pepper(MiddlewareCommunicator):
         if switch_emotion is not None and isinstance(switch_emotion, dict):
             self.update_facial_expressions(switch_emotion.get("emotion_category", None), part=switch_emotion.get("part", "LIGHTS"), _mware=self.MWARE)
 
-        speech_text, = self.receive_speech_text(speech_text_port=self.SPEECH_TEXT_PORT, mware=self.MWARE)
+        speech_text, = self.receive_speech_text(speech_text_port=self.SPEECH_TEXT_PORT, _mware=self.MWARE)
         if speech_text is not None:
             self.update_speech_text(speech_text, _mware=self.MWARE)
 
@@ -274,7 +275,7 @@ def parse_args():
                         help="The port (topic) name used for receiving and transmitting facial expressions. "
                              "Setting the port name without --set_facial_expressions will only receive the facial expressions")
     parser.add_argument("--control_speech", action="store_true", help="Control the Pepper speakerphone")
-    parser.add_argument("--speech_text_port", type=str, default="/control_interface/facial_expressions",
+    parser.add_argument("--speech_text_port", type=str, default="/control_interface/speech_text",
                         help="The port (topic) name used for receiving text to be spoken by the Pepper")
     parser.add_argument("--mware", type=str, default=PEPPER_DEFAULT_COMMUNICATOR,
                         help="The middleware used for communication. "
