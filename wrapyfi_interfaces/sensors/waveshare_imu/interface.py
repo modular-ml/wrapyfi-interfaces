@@ -29,6 +29,7 @@ class WaveshareIMU(MiddlewareCommunicator):
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
                  flip_pitch=False, flip_yaw=False, flip_roll=False,
+                 const_pitch_offset=0.0, const_yaw_offset=0.0, const_roll_offset=0.0,
                  orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, mware=MWARE,
                  baseline_orientation_coordinates_port=BASELINE_ORIENTATION_COORDINATES_PORT,
                  baseline_mware=BASELINE_MWARE):
@@ -49,6 +50,10 @@ class WaveshareIMU(MiddlewareCommunicator):
         self.pitch_offset = 0.0
         self.yaw_offset = 0.0
         self.roll_offset = 0.0
+        
+        self.const_pitch_offset = const_pitch_offset
+        self.const_yaw_offset = const_yaw_offset
+        self.const_roll_offset = const_roll_offset
 
         # yaw filtering
         # self.yaw_queue = deque(maxlen=self.YAW_QUEUE_SIZE)
@@ -80,9 +85,9 @@ class WaveshareIMU(MiddlewareCommunicator):
             sensor_data = self.pico.readline().decode("utf-8")
             sensor_data = sensor_data.replace("nan", "\"nan\"")
             imu_data = json.loads(sensor_data)
-            imu_data["pitch"] = -imu_data["pitch"] - self.pitch_offset if self.flip_pitch else imu_data["pitch"] - self.pitch_offset
-            imu_data["yaw"] = -imu_data["yaw"] - self.yaw_offset if self.flip_pitch else imu_data["yaw"] - self.yaw_offset
-            imu_data["roll"] = -imu_data["roll"] - self.roll_offset if self.flip_pitch else imu_data["roll"] - self.roll_offset
+            imu_data["pitch"] = -imu_data["pitch"] - self.pitch_offset - self.const_pitch_offset if self.flip_pitch else imu_data["pitch"] - self.pitch_offset - self.const_pitch_offset
+            imu_data["yaw"] = -imu_data["yaw"] - self.yaw_offset - self.const_yaw_offset if self.flip_pitch else imu_data["yaw"] - self.yaw_offset - self.const_yaw_offset
+            imu_data["roll"] = -imu_data["roll"] - self.roll_offset - self.const_roll_offset if self.flip_pitch else imu_data["roll"] - self.roll_offset - self.const_roll_offset
             imu_data.update(topic=orientation_coordinates_port.split("/")[-1],
                             world_index=self.counter,
                             order="xyz",
@@ -185,6 +190,9 @@ def parse_args():
     parser.add_argument("--flip_pitch", action="store_true", help="Flip the pitch coordinates on publishing")
     parser.add_argument("--flip_yaw", action="store_true", help="Flip the yaw coordinates on publishing")
     parser.add_argument("--flip_roll", action="store_true", help="Flip the roll coordinates on publishing")
+    parser.add_argument("--const_pitch_offset", type=float, default=0.0, help="Constant pitch offset in degrees")
+    parser.add_argument("--const_yaw_offset", type=float, default=0.0, help="Constant yaw offset in degrees")
+    parser.add_argument("--const_roll_offset", type=float, default=0.0, help="Constant roll offset in degrees")
     parser.add_argument("--mware", type=str, default=WAVESHARE_IMU_DEFAULT_COMMUNICATOR,
                         help="The middleware used for communication. "
                              "This can be overriden by providing either of the following environment variables "
