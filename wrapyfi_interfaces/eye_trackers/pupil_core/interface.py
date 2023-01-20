@@ -518,7 +518,7 @@ class PupilCore(MiddlewareCommunicator):
                 time.sleep(self.getPeriod())
             except Exception as e:
                 logging.error(e)
-                break
+                # break
         if hasattr(self, "pub_socket"):
             self.end_recording()
 
