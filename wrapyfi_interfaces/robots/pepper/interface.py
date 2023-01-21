@@ -61,7 +61,7 @@ class Pepper(MiddlewareCommunicator):
     CAP_PROP_FRAME_HEIGHT = 480
     LOOP_RATE = 30
     FACIAL_EXPRESSIONS_PORT = "/control_interface/facial_expressions"
-    FACIAL_EXPRESSIONS_QUEUE_SIZE = 50
+    FACIAL_EXPRESSIONS_QUEUE_SIZE = 7
     FACIAL_EXPRESSION_SMOOTHING_WINDOW = 6
     LED_SERVICE = "/pepper/leds/set_rgb"
     SPEECH_TEXT_PORT = "/control_interface/speech_text"
