@@ -80,7 +80,7 @@ class ICub(MiddlewareCommunicator, yarp.RFModule):
     GAZE_PLANE_COORDINATES_PORT = "/control_interface/gaze_plane_coordinates"
     FACIAL_EXPRESSIONS_PORT = "/control_interface/facial_expressions"
     # constants
-    FACIAL_EXPRESSIONS_QUEUE_SIZE = 50
+    FACIAL_EXPRESSIONS_QUEUE_SIZE = 7
     FACIAL_EXPRESSION_SMOOTHING_WINDOW = 6
 
     def __init__(self, simulation=False, headless=False, get_cam_feed=True,
