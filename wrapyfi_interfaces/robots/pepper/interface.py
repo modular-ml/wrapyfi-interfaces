@@ -46,11 +46,11 @@ EMOTION_LEDS_LOOKUP = {
     "neu": "white",
     "hap": "green",
     "sad": "blue",
-    "sur": "yellow",
-    "shy": "cyan",
-    "cun": (1.0, 0.5, 0.0),
+    "sur": (1.0, 0.5, 0.0),
+    "shy": "yellow",
+    "cun": "magenta",
     "ang": "red",
-    "evi": "magenta",
+    "evi": "cyan",
 }
 
 
