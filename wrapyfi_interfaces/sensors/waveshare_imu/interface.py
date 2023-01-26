@@ -29,6 +29,7 @@ class WaveshareIMU(MiddlewareCommunicator):
 
     def __init__(self, ser_device="/dev/ttyACM0", ser_rate=115200,
                  flip_pitch=False, flip_yaw=False, flip_roll=False,
+                 disable_pitch=False, disable_yaw=False, disable_roll=False,
                  const_pitch_offset=0.0, const_yaw_offset=0.0, const_roll_offset=0.0,
                  orientation_coordinates_port=ORIENTATION_COORDINATES_PORT, mware=MWARE,
                  baseline_orientation_coordinates_port=BASELINE_ORIENTATION_COORDINATES_PORT,
@@ -54,7 +55,11 @@ class WaveshareIMU(MiddlewareCommunicator):
         self.const_pitch_offset = const_pitch_offset
         self.const_yaw_offset = const_yaw_offset
         self.const_roll_offset = const_roll_offset
-
+        
+        self.disable_pitch = disable_pitch
+        self.disable_yaw = disable_yaw
+        self.disable_roll = disable_roll
+        
         # yaw filtering
         # self.yaw_queue = deque(maxlen=self.YAW_QUEUE_SIZE)
         self.prev_yaw = {"yaw": 0.0, "orig_timestamp": 0.0}
@@ -85,16 +90,29 @@ class WaveshareIMU(MiddlewareCommunicator):
             sensor_data = self.pico.readline().decode("utf-8")
             sensor_data = sensor_data.replace("nan", "\"nan\"")
             imu_data = json.loads(sensor_data)
-            imu_data["pitch"] = -imu_data["pitch"] - self.pitch_offset - self.const_pitch_offset if self.flip_pitch else imu_data["pitch"] - self.pitch_offset - self.const_pitch_offset
-            imu_data["yaw"] = -imu_data["yaw"] - self.yaw_offset - self.const_yaw_offset if self.flip_pitch else imu_data["yaw"] - self.yaw_offset - self.const_yaw_offset
-            imu_data["roll"] = -imu_data["roll"] - self.roll_offset - self.const_roll_offset if self.flip_pitch else imu_data["roll"] - self.roll_offset - self.const_roll_offset
+            
+            if self.disable_pitch:
+                imu_data["pitch"] = 0.0
+            else:
+                imu_data["pitch"] = -imu_data["pitch"] - self.pitch_offset - self.const_pitch_offset if self.flip_pitch else imu_data["pitch"] - self.pitch_offset - self.const_pitch_offset
+            
+            if self.disable_yaw:
+                imu_data["yaw"] = 0.0
+            else:
+                imu_data["yaw"] = -imu_data["yaw"] - self.yaw_offset - self.const_yaw_offset if self.flip_pitch else imu_data["yaw"] - self.yaw_offset - self.const_yaw_offset
+            
+            if self.disable_roll:
+                imu_data["roll"] = 0.0
+            else:
+                imu_data["roll"] = -imu_data["roll"] - self.roll_offset - self.const_roll_offset if self.flip_pitch else imu_data["roll"] - self.roll_offset - self.const_roll_offset
+            
             imu_data.update(topic=orientation_coordinates_port.split("/")[-1],
                             world_index=self.counter,
                             order="xyz",
                             quaternion=False,
                             timestamp=time.time())
             # print("yaw differencing", imu_data["yaw"] - self.prev_yaw)
-            if yaw_smoothing == "threshold":
+            if yaw_smoothing == "threshold" and not self.disable_yaw:
                 if abs((imu_data["yaw"] - self.prev_yaw["yaw"]) /
                        (imu_data["orig_timestamp"] - self.prev_yaw["orig_timestamp"])) > self.YAW_DIFFERENCE_LOWER_THRESHOLD:
                     self.last_yaw["orig_timestamp"] = imu_data["orig_timestamp"]
@@ -193,6 +211,9 @@ def parse_args():
     parser.add_argument("--const_pitch_offset", type=float, default=0.0, help="Constant pitch offset in degrees")
     parser.add_argument("--const_yaw_offset", type=float, default=0.0, help="Constant yaw offset in degrees")
     parser.add_argument("--const_roll_offset", type=float, default=0.0, help="Constant roll offset in degrees")
+    parser.add_argument("--disable_pitch", action="store_true", help="Disable the pitch coordinates (set to 0.0) on publishing")
+    parser.add_argument("--disable_yaw", action="store_true", help="Disable the yaw coordinates (set to 0.0) on publishing")
+    parser.add_argument("--disable_roll", action="store_true", help="Disable the roll coordinates (set to 0.0) on publishing")
     parser.add_argument("--mware", type=str, default=WAVESHARE_IMU_DEFAULT_COMMUNICATOR,
                         help="The middleware used for communication. "
                              "This can be overriden by providing either of the following environment variables "
