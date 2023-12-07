@@ -58,12 +58,12 @@ Install from the source by following the [official installation documentation](h
 3. To issue instructions for controlling the iCub's head from this Python-based interface, simply start the following script from this repository's root directory: 
 
     ```
-   python3 wrapyfi/robots/icub_head/interface.py \
+   python3 wrapyfi_interfaces/robots/icub_head/interface.py \
     --simulation --get_cam_feed --control_head \
    --set_head_eye_coordinates \
    --head_eye_coordinates_port "/control_interface/head_eye_coordinates" \
    --control_expressions --set_facial_expressions \
-   --facial_expressions_port "/emotion_interface/facial_expression"
+   --facial_expressions_port "/control_interface/facial_expressions_icub"
    ```
     
     You can also manually control the joints by using the YARP's built-in motor controller GUI 
