@@ -14,6 +14,8 @@
 
 	You should have received a copy of the GNU General Public License
 	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+	Modified by Fares Abawi (f.abawi@outlook.com)
 */
 #include "icm20948.h"
 #include "lps22hb.h"
