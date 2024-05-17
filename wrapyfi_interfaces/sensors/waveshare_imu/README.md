@@ -2,15 +2,13 @@
 
 The [Waveshare Inertial Measurement Unit (IMU)](https://www.waveshare.com/wiki/Pico-10DOF-IMU) is attached to the [Pupil Core](https://pupil-labs.com/products/core/) eye tracker, above the left-eye frame.
 
-We use a RaspberryPi pico to communicate with the IMU. The code needed to extract the readings can be compiled using the compiler found in ``/informatik3/wtm/software/Driver/eye-tracker-extension_rpi-pico_waveshare-10-dof-imu``
+We use a RaspberryPi pico to communicate with the IMU. The code needed to extract the readings can be compiled using the [compiler](https://1drv.ms/u/s!AtsoXIeDdjRojK0MNIdQL-hXWY-Zbw?e=VT9Fg3) and [Pico script]((https://1drv.ms/u/s!AtsoXIeDdjRoioVLDDwbVtk2IYTHZw?e=ZRaIcB), both of which should be copied/downloaded to a directory named `./src` in this directory.  
 
 ## Compile raspberry-pico code
 
 If you'd like to alter the raspberry-pico source, modify `pico/c/main.c` and then compile it (from this directory):
 
 ```
-mkdir src
-rsync -P /informatik3/wtm/software/Driver/eye-tracker-extension_rpi-pico_waveshare-10-dof-imu/* src/
 cd src 
 tar -xf gcc-arm-none-eabi-10.3-2021.10-x86_64-linux.tar.bz2
 unzip Pico-10dof-imu.zip
